@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { updateUserProfile } from "../lib/firestore";
 import { generateFoodiePersonality } from "../lib/gemini";
 import type { FoodieProfile } from "../lib/types";
-import { sanitize, validatePersonalInfo, validateBudget } from "../lib/validation";
+import { sanitize, sanitizeName, validatePersonalInfo, validateBudget } from "../lib/validation";
 
 const STEPS = ["Personal Info", "Lifestyle", "Diet & Cuisine", "Cooking & Spice", "Medical", "Budget & Access", "Foodie Quiz"];
 
@@ -131,7 +131,7 @@ export default function OnboardingPage() {
         const wBudget = parseFloat(weeklyBudget) || 1500;
         const mBudget = parseFloat(monthlyBudget) || 6000;
         const bmi = +(w / ((h / 100) ** 2)).toFixed(1);
-        const cleanName = sanitize(name) || "User";
+        const cleanName = sanitizeName(name) || "User";
         await updateUserProfile(user.uid, {
             name: cleanName, age: parsedAge, gender: (gender as any) || "other",
             height: h, weight: w, bmi, goal: (goal as any) || "maintain",
@@ -159,6 +159,7 @@ export default function OnboardingPage() {
     function handleContinue() {
         if (step === 0) {
             const errors = validatePersonalInfo({
+                name: name,
                 age: parseInt(age) || 0,
                 weight: parseFloat(weight) || 0,
                 height: parseFloat(height) || 0,

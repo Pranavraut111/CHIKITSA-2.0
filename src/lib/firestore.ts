@@ -200,9 +200,18 @@ export async function saveCommunityPost(post: CommunityPost) {
 }
 
 export async function getCommunityPosts(): Promise<CommunityPost[]> {
-    const q = query(collection(db, "communityPosts"), orderBy("timestamp", "desc"), limit(50));
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
+    try {
+        // Try ordered query first (requires Firestore index)
+        const q = query(collection(db, "communityPosts"), orderBy("timestamp", "desc"), limit(50));
+        const snap = await getDocs(q);
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
+    } catch (err) {
+        console.warn("Community orderBy query failed (index may be missing), falling back:", err);
+        // Fallback: fetch without ordering, sort client-side
+        const snap = await getDocs(collection(db, "communityPosts"));
+        const posts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
+        return posts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
 }
 
 export async function updateCommunityPost(postId: string, updates: Partial<CommunityPost>) {

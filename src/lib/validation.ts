@@ -1,12 +1,28 @@
-/** Sanitize user input — strip HTML/script tags to prevent XSS */
+/**
+ * Sanitize user input — strips ALL HTML tags, special characters,
+ * script injections, and dangerous patterns.
+ * Use this on EVERY user-entered text before saving to Firestore.
+ */
 export function sanitize(input: string): string {
     return input
-        .replace(/<[^>]*>/g, "")           // strip all HTML tags
-        .replace(/&lt;/g, "<").replace(/&gt;/g, ">")  // normalize entities
-        .replace(/<[^>]*>/g, "")           // re-strip after entity decode
+        .replace(/<[^>]*>/g, "")           // strip HTML tags like <div>, <script>, </div>
+        .replace(/&lt;/g, "").replace(/&gt;/g, "")  // remove encoded entities
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, "")
+        .replace(/&#\d+;/g, "")            // remove numeric HTML entities
         .replace(/javascript:/gi, "")      // remove JS protocol
-        .replace(/on\w+\s*=/gi, "")        // remove event handlers like onclick=
+        .replace(/on\w+\s*=/gi, "")        // remove event handlers (onclick=, onerror=)
+        .replace(/[<>{}]/g, "")            // remove angle brackets and curly braces
         .trim();
+}
+
+/**
+ * Strict sanitizer for names — only allows letters, numbers, spaces, and basic punctuation.
+ * Blocks ALL special characters, tags, and code injection attempts.
+ */
+export function sanitizeName(input: string): string {
+    // Only allow: letters (any language), numbers, spaces, dots, hyphens, apostrophes
+    return input.replace(/[^a-zA-Z0-9\s.\-'À-ÿ]/g, "").trim();
 }
 
 /** Validate onboarding inputs and return error messages */
@@ -17,13 +33,12 @@ export interface ValidationError {
 
 /**
  * Gender + age-based weight ranges (in kg)
- * Tightened for Indian body statistics:
  *   Child 5-8:    14 – 30 kg
  *   Child 9-11:   20 – 45 kg
  *   Boy 12-17:    30 – 80 kg
  *   Girl 12-17:   25 – 70 kg
  *   Adult Male:   50 – 120 kg
- *   Adult Female: 40 – 100 kg
+ *   Adult Female:  40 – 100 kg
  *   Other:        same as Male
  */
 function getWeightRange(age: number, gender: string): [number, number] {
@@ -47,8 +62,9 @@ function getHeightRange(age: number): [number, number] {
     return [140, 220];
 }
 
-/** Validate personal info (step 0) — called on Continue */
+/** Validate personal info (step 0) — blocks Continue if invalid */
 export function validatePersonalInfo(data: {
+    name: string;
     age: number;
     weight: number;
     height: number;
@@ -56,10 +72,20 @@ export function validatePersonalInfo(data: {
 }): ValidationError[] {
     const errors: ValidationError[] = [];
 
+    // Name — no special characters allowed
+    if (!data.name || data.name.length < 2) {
+        errors.push({ field: "name", message: "Name must be at least 2 characters" });
+    }
+    if (data.name !== sanitizeName(data.name)) {
+        errors.push({ field: "name", message: "Name contains invalid characters. Only letters, numbers, spaces, dots and hyphens are allowed. Kindly re-enter." });
+    }
+
+    // Age
     if (data.age < 5 || data.age > 120) {
         errors.push({ field: "age", message: "Age must be between 5 and 120 years" });
     }
 
+    // Height (age-appropriate)
     if (data.height < 60 || data.height > 270) {
         errors.push({ field: "height", message: "Height must be between 60 and 270 cm" });
     } else if (data.age >= 5) {
@@ -69,6 +95,7 @@ export function validatePersonalInfo(data: {
         }
     }
 
+    // Weight (gender + age appropriate)
     if (data.weight < 10 || data.weight > 300) {
         errors.push({ field: "weight", message: "Weight must be between 10 and 300 kg" });
     } else if (data.age >= 5) {
@@ -82,7 +109,7 @@ export function validatePersonalInfo(data: {
     return errors;
 }
 
-/** Validate budget info (step 5) — called on Continue */
+/** Validate budget info (step 5) — blocks Continue if invalid */
 export function validateBudget(data: {
     weeklyBudget: number;
     monthlyBudget: number;

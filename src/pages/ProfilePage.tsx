@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { updateUserProfile } from "../lib/firestore";
+import { sanitize, sanitizeName, validatePersonalInfo, validateBudget } from "../lib/validation";
 
 const MEDICAL = ["Diabetes", "Hypertension", "PCOS", "Thyroid", "High Cholesterol", "Kidney Issues", "Heart Disease", "Anemia"];
 
@@ -9,6 +10,7 @@ export default function ProfilePage() {
     const { user, profile, refreshProfile } = useAuth();
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [errors, setErrors] = useState<string[]>([]);
     const [name, setName] = useState(""); const [age, setAge] = useState(""); const [gender, setGender] = useState("");
     const [height, setHeight] = useState(""); const [weight, setWeight] = useState(""); const [goal, setGoal] = useState("");
     const [activityLevel, setActivityLevel] = useState(""); const [dietType, setDietType] = useState("");
@@ -28,10 +30,45 @@ export default function ProfilePage() {
     function toggleCondition(c: string) { setConditions(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]); }
 
     async function handleSave() {
-        if (!user) return; setSaving(true);
+        if (!user) return;
+
+        // Validate personal info
+        const personalErrors = validatePersonalInfo({
+            name: name,
+            age: parseInt(age) || 0,
+            weight: parseFloat(weight) || 0,
+            height: parseFloat(height) || 0,
+            gender: gender || "other",
+        });
+        const budgetErrors = validateBudget({
+            weeklyBudget: parseFloat(weeklyBudget) || 0,
+            monthlyBudget: parseFloat(monthlyBudget) || 0,
+        });
+        const allErrors = [...personalErrors, ...budgetErrors];
+        if (allErrors.length > 0) {
+            setErrors(allErrors.map(e => e.message));
+            return;
+        }
+        setErrors([]);
+
+        setSaving(true);
         const h = parseFloat(height) || 170; const w = parseFloat(weight) || 70;
         const bmi = +(w / ((h / 100) ** 2)).toFixed(1);
-        await updateUserProfile(user.uid, { name, age: parseInt(age) || 25, gender: gender as any, height: h, weight: w, bmi, goal: goal as any, activityLevel: activityLevel as any, dietType: dietType as any, allergies: allergies ? allergies.split(",").map(s => s.trim()) : [], medicalConditions: conditions, weeklyBudget: parseFloat(weeklyBudget) || 1500, monthlyBudget: parseFloat(monthlyBudget) || 6000, location });
+        const cleanName = sanitizeName(name) || "User";
+        await updateUserProfile(user.uid, {
+            name: cleanName,
+            age: parseInt(age) || 25,
+            gender: gender as any,
+            height: h, weight: w, bmi,
+            goal: goal as any,
+            activityLevel: activityLevel as any,
+            dietType: dietType as any,
+            allergies: allergies ? allergies.split(",").map(s => sanitize(s.trim())) : [],
+            medicalConditions: conditions,
+            weeklyBudget: parseFloat(weeklyBudget) || 1500,
+            monthlyBudget: parseFloat(monthlyBudget) || 6000,
+            location: sanitize(location),
+        });
         await refreshProfile(); setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 3000);
     }
 
@@ -44,6 +81,13 @@ export default function ProfilePage() {
                 <span className="text-xs text-slate-400 dark:text-slate-500">{user?.email}</span>
             </div>
             {saved && <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-xl px-4 py-2.5 text-xs font-medium text-green-600 dark:text-green-400">Profile updated successfully.</div>}
+            {errors.length > 0 && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                    {errors.map((err, i) => (
+                        <p key={i} className="text-xs text-red-600 dark:text-red-400 font-medium">⚠️ {err}</p>
+                    ))}
+                </div>
+            )}
             <Section title="Personal Information">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="sm:col-span-2"><Label>Name</Label><input value={name} onChange={e => setName(e.target.value)} className={inputCls} /></div>

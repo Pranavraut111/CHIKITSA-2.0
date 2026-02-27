@@ -55,7 +55,7 @@ export default function CommunityPage() {
             try {
                 const firestorePosts = await getCommunityPosts();
                 setPosts(firestorePosts);
-            } catch { /* ignore */ }
+            } catch (err) { console.error("Failed to load community posts:", err); }
         }
         loadPosts();
     }, []);
