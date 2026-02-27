@@ -131,7 +131,7 @@ export default function OnboardingPage() {
         const mBudget = parseFloat(monthlyBudget) || 6000;
 
         // Validate inputs
-        const errors = validateOnboarding({ age: parsedAge, weight: w, height: h, weeklyBudget: wBudget, monthlyBudget: mBudget });
+        const errors = validateOnboarding({ age: parsedAge, weight: w, height: h, gender: gender || "other", weeklyBudget: wBudget, monthlyBudget: mBudget });
         if (errors.length > 0) {
             setValidationErrors(errors.map(e => e.message));
             setSaving(false);
