@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { updateUserProfile } from "../lib/firestore";
 import { generateFoodiePersonality } from "../lib/gemini";
 import type { FoodieProfile } from "../lib/types";
+import { sanitize, validateOnboarding } from "../lib/validation";
 
 const STEPS = ["Personal Info", "Lifestyle", "Diet & Cuisine", "Cooking & Spice", "Medical", "Budget & Access", "Foodie Quiz"];
 
@@ -100,6 +101,7 @@ export default function OnboardingPage() {
     const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
     const [foodieResult, setFoodieResult] = useState<FoodieProfile | null>(null);
     const [quizLoading, setQuizLoading] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
     function toggleCuisine(c: string) { setSelectedCuisines(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c]); }
     function toggleCondition(c: string) {
@@ -122,21 +124,36 @@ export default function OnboardingPage() {
     }
 
     async function handleFinish() {
-        if (!user) return; setSaving(true);
+        if (!user) return;
         const h = parseFloat(height) || 170; const w = parseFloat(weight) || 70;
+        const parsedAge = parseInt(age) || 25;
+        const wBudget = parseFloat(weeklyBudget) || 1500;
+        const mBudget = parseFloat(monthlyBudget) || 6000;
+
+        // Validate inputs
+        const errors = validateOnboarding({ age: parsedAge, weight: w, height: h, weeklyBudget: wBudget, monthlyBudget: mBudget });
+        if (errors.length > 0) {
+            setValidationErrors(errors.map(e => e.message));
+            setSaving(false);
+            return;
+        }
+        setValidationErrors([]);
+        setSaving(true);
+
         const bmi = +(w / ((h / 100) ** 2)).toFixed(1);
+        const cleanName = sanitize(name) || "User";
         await updateUserProfile(user.uid, {
-            name: name || "User", age: parseInt(age) || 25, gender: (gender as any) || "other",
+            name: cleanName, age: parsedAge, gender: (gender as any) || "other",
             height: h, weight: w, bmi, goal: (goal as any) || "maintain",
             activityLevel: (activityLevel as any) || "moderate",
             sleepSchedule: sleepSchedule || "11 PM - 7 AM", workRoutine: workRoutine || "9 AM - 6 PM",
             mealFrequency: parseInt(mealFrequency) || 3, dietType: (dietType as any) || "anything",
-            allergies: allergies ? allergies.split(",").map(s => s.trim()) : [],
-            foodDislikes: foodDislikes ? foodDislikes.split(",").map(s => s.trim()) : [],
+            allergies: allergies ? allergies.split(",").map(s => sanitize(s.trim())) : [],
+            foodDislikes: foodDislikes ? foodDislikes.split(",").map(s => sanitize(s.trim())) : [],
             cuisinePreference: selectedCuisines,
             medicalConditions: selectedConditions.includes("None") ? [] : selectedConditions,
-            weeklyBudget: parseFloat(weeklyBudget) || 1500, monthlyBudget: parseFloat(monthlyBudget) || 6000,
-            location: location || "India", onboardingComplete: true,
+            weeklyBudget: wBudget, monthlyBudget: mBudget,
+            location: sanitize(location) || "India", onboardingComplete: true,
             cookingSkill: (cookingSkill as any) || "intermediate",
             spiceTolerance: (spiceTolerance as any) || "medium",
             mealTimings: mealTiming || "regular",
@@ -215,6 +232,13 @@ export default function OnboardingPage() {
                                             </div>
                                         </div>
                                     </div>
+                                    {validationErrors.length > 0 && (
+                                        <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                                            {validationErrors.map((err, i) => (
+                                                <p key={i} className="text-xs text-red-600 dark:text-red-400 font-medium">⚠️ {err}</p>
+                                            ))}
+                                        </div>
+                                    )}
                                 </>
                             )}
 
@@ -328,9 +352,15 @@ export default function OnboardingPage() {
                                 <>
                                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Budget & Access</h2>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Weekly Budget (₹)</label><input type="number" value={weeklyBudget} onChange={e => setWeeklyBudget(e.target.value)} placeholder="1500" className={inputCls} /></div>
-                                        <div><label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Monthly Budget (₹)</label><input type="number" value={monthlyBudget} onChange={e => setMonthlyBudget(e.target.value)} placeholder="6000" className={inputCls} /></div>
+                                        <div><label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Weekly Budget (₹)</label><input type="number" min="200" value={weeklyBudget} onChange={e => setWeeklyBudget(e.target.value)} placeholder="1500" className={inputCls} /></div>
+                                        <div><label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Monthly Budget (₹)</label><input type="number" min="500" value={monthlyBudget} onChange={e => setMonthlyBudget(e.target.value)} placeholder="6000" className={inputCls} /></div>
                                     </div>
+                                    {(parseFloat(weeklyBudget) > 0 && parseFloat(weeklyBudget) < 200) && (
+                                        <p className="text-xs text-red-500 font-medium">⚠️ Weekly budget should be at least ₹200 for realistic meal planning</p>
+                                    )}
+                                    {(parseFloat(monthlyBudget) > 0 && parseFloat(monthlyBudget) < parseFloat(weeklyBudget)) && (
+                                        <p className="text-xs text-red-500 font-medium">⚠️ Monthly budget can't be less than weekly budget</p>
+                                    )}
                                     <div><label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">City / Region</label><input value={location} onChange={e => setLocation(e.target.value)} placeholder="Mumbai, India" className={inputCls} /></div>
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">Grocery Access</label>

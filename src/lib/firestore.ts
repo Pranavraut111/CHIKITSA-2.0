@@ -176,3 +176,35 @@ export async function getSharedPlans(): Promise<SharedPlan[]> {
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SharedPlan));
 }
+
+/* ═══════════════════ COMMUNITY POSTS ═══════════════════ */
+
+export interface CommunityPost {
+    id: string;
+    author: string;
+    authorAvatar: string;
+    authorUid: string;
+    content: string;
+    type: "text" | "meal_plan" | "achievement" | "photo";
+    imageUrl?: string;
+    mealPlan?: { date: string; meals: { type: string; name: string; calories: number }[] };
+    achievement?: { title: string; icon: string };
+    likes: number;
+    likedBy: string[];
+    comments: { id: string; author: string; content: string; timestamp: string }[];
+    timestamp: string;
+}
+
+export async function saveCommunityPost(post: CommunityPost) {
+    await setDoc(doc(db, "communityPosts", post.id), post);
+}
+
+export async function getCommunityPosts(): Promise<CommunityPost[]> {
+    const q = query(collection(db, "communityPosts"), orderBy("timestamp", "desc"), limit(50));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as CommunityPost));
+}
+
+export async function updateCommunityPost(postId: string, updates: Partial<CommunityPost>) {
+    await updateDoc(doc(db, "communityPosts", postId), updates as Record<string, unknown>);
+}

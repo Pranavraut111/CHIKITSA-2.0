@@ -1,73 +1,181 @@
-# React + TypeScript + Vite
+# CHIKITSA 2.0
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Your AI-Powered Personal Nutritionist — Built for India**
 
-Currently, two official plugins are available:
+CHIKITSA (meaning "treatment" in Hindi) is a smart nutrition and wellness platform that creates hyper-personalized meal plans, tracks food intake through photos, generates real grocery lists, and makes healthy eating fun through gamification — all designed specifically for Indian food, budgets, and dietary needs.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## What Makes It Different
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Unlike generic calorie counters, CHIKITSA understands the difference between a dosa and a paratha. It knows your grandmother's dal recipe needs different ingredients than a restaurant version. And it won't suggest avocado toast when you're on a ₹1500/week budget.
 
-## Expanding the ESLint configuration
+- Understands 7+ Indian cuisines (South Indian, Punjabi, Chinese-Indian, Continental, etc.)
+- Respects medical conditions (diabetes, PCOS, hypertension, thyroid — 12+ conditions)
+- Works within your actual food budget (₹200-50,000/week)
+- Gives honest health advice, not just numbers ("limit pooris to 1-2, pair with salad")
+- Validates inputs properly — won't accept a 12-year-old weighing 80kg or a ₹20 weekly food budget
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Features
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Smart Onboarding
+A 7-step health profile that captures 25+ data points — from your sleep schedule to your spice tolerance. Every AI response is tailored to this profile. Inputs are validated for realistic values and sanitized against XSS attacks.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### AI Meal Plans
+One-tap daily meal plans with full recipes, ingredient lists, and macro breakdowns. Choose your cuisine, cooking time preference, and spice level. Swap individual meals you don't like. Tick to log what you ate.
+
+### Food Photo Scanner
+Upload a photo of your food. Gemini Vision identifies every item and gives you calories, macros, a health score out of 10, and practical advice on how much you should actually eat.
+
+### Smart Grocery Lists
+Select which meals you want to cook, get a realistic ingredient list with exact quantities (not bulk amounts), and buy directly through Amazon, Blinkit, Zepto, or BigBasket links.
+
+### AI Health Chat
+A conversational nutritionist that knows your profile, medical conditions, and food history. Ask anything from "Is paneer healthy for me?" to "What should I eat before a workout?"
+
+### Gamification
+XP points, levels, streaks, achievements, and a virtual pet named Chompy who unlocks at Level 20. Logging meals earns XP. Consistency earns badges. It makes tracking your food feel less like a chore.
+
+### Community
+Share meal plans, achievements, and food photos. Like and comment on posts. All posts persist across sessions — no more disappearing content on refresh.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18 + TypeScript + Vite |
+| AI | Google Gemini 2.5 Flash (text + vision) |
+| Auth | Firebase Authentication (Google + Email) |
+| Database | Cloud Firestore |
+| Animations | Framer Motion |
+| Styling | Vanilla CSS (dark mode supported) |
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- A Firebase project with Firestore and Authentication enabled
+- A Google Gemini API key
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/Pranavraut111/CHIKITSA-2.0.git
+cd CHIKITSA-2.0
+
+# Install dependencies
+npm install
+
+# Create environment file
+cp .env.example .env.local
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Add your keys to `.env.local`:
 ```
+VITE_GEMINI_API_KEY=your_gemini_api_key
+```
+
+Firebase config is in `src/lib/firebase.ts`.
+
+### Run locally
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173)
+
+### Build for production
+
+```bash
+npm run build
+```
+
+---
+
+## Project Structure
+
+```
+src/
+├── components/        # Reusable UI components (HeroScroll, VirtualPet, etc.)
+├── contexts/          # React contexts (Auth, Theme, Gamification)
+├── layouts/           # App layout with sidebar navigation
+├── lib/
+│   ├── firebase.ts    # Firebase configuration
+│   ├── firestore.ts   # All Firestore CRUD operations
+│   ├── gemini.ts      # Gemini AI prompt functions
+│   ├── types.ts       # TypeScript interfaces
+│   └── validation.ts  # Input validation & XSS sanitization
+├── pages/             # All route pages
+│   ├── LandingPage    # Public landing page
+│   ├── AuthPage       # Login / Sign up
+│   ├── OnboardingPage # 7-step health profile (with input validation)
+│   ├── DashboardPage  # Stats, calorie ring, weekly chart
+│   ├── MealsPage      # AI meal plan generator
+│   ├── GroceryPage    # Smart grocery list with ecommerce links
+│   ├── LogPage        # Manual food logging
+│   ├── ChatPage       # AI health chatbot + photo scanner
+│   ├── MapPage        # Nearby grocery stores
+│   ├── AchievementsPage # Badges + virtual pet (Chompy)
+│   ├── CommunityPage  # Social feed (Firestore-backed)
+│   └── ProfilePage    # User profile management
+└── App.tsx            # Routes and providers
+```
+
+---
+
+## Security
+
+- All user-facing text inputs are sanitized to prevent XSS (HTML tag injection)
+- Profile names, community posts, and comments are stripped of `<script>`, `<img>`, and all HTML tags
+- Event handler attributes (`onclick=`, `onerror=`) are removed from inputs
+- `javascript:` protocol URIs are blocked
+- Firebase security rules should be configured for production use
+
+---
+
+## Data Model
+
+```
+Firestore
+├── users/{uid}
+│   ├── (profile fields)
+│   ├── mealPlans/{date}        → daily meal plan
+│   ├── foodLogs/{id}           → individual food entries
+│   ├── groceryLists/{date}     → grocery items
+│   ├── chatHistory/{id}        → chat messages
+│   ├── achievements/{id}       → unlocked achievements
+│   ├── challenges/{id}         → active challenges
+│   └── gameState/
+│       ├── pet                 → virtual pet state
+│       └── userLevel           → XP and level
+├── communityPosts/{id}         → social feed posts
+└── sharedPlans/{id}            → publicly shared meal plans
+```
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes (`git commit -m 'Add your feature'`)
+4. Push to the branch (`git push origin feature/your-feature`)
+5. Open a Pull Request
+
+---
+
+## License
+
+This project is part of an academic submission. Please contact the author before using it commercially.
+
+---
+
+Built with care by [Pranav Raut](https://github.com/Pranavraut111)

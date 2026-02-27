@@ -1,27 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useGamification } from "../contexts/GamificationContext";
-import { getMealPlanHistory } from "../lib/firestore";
+import { getMealPlanHistory, saveCommunityPost, getCommunityPosts, updateCommunityPost } from "../lib/firestore";
+import type { CommunityPost } from "../lib/firestore";
 import type { DailyMealPlan } from "../lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { sanitize } from "../lib/validation";
 
 type Tab = "feed" | "leaderboard" | "challenges";
-type PostType = "text" | "meal_plan" | "achievement" | "photo";
-
-interface Post {
-    id: string;
-    author: string;
-    authorAvatar: string;
-    content: string;
-    type: PostType;
-    imageUrl?: string;
-    mealPlan?: { date: string; meals: { type: string; name: string; calories: number }[] };
-    achievement?: { title: string; icon: string };
-    likes: number;
-    comments: Comment[];
-    timestamp: string;
-    liked: boolean;
-}
 
 interface Comment {
     id: string;
@@ -36,7 +22,7 @@ export default function CommunityPage() {
     const { user, profile } = useAuth();
     const { challenges: userChallenges, acceptChallenge, updateChallengeProgress, achievements, userLevel, streak } = useGamification();
     const [tab, setTab] = useState<Tab>("feed");
-    const [posts, setPosts] = useState<Post[]>([]);
+    const [posts, setPosts] = useState<CommunityPost[]>([]);
     const [newPost, setNewPost] = useState("");
     const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
     const [commentInput, setCommentInput] = useState<Record<string, string>>({});
@@ -63,6 +49,17 @@ export default function CommunityPage() {
         { title: "Cook at home for 5 days", icon: "👨‍🍳", target: 5, unit: "days", xpReward: 60, difficulty: "Hard" },
     ];
 
+    // Load posts from Firestore on mount
+    useEffect(() => {
+        async function loadPosts() {
+            try {
+                const firestorePosts = await getCommunityPosts();
+                setPosts(firestorePosts);
+            } catch { /* ignore */ }
+        }
+        loadPosts();
+    }, []);
+
     async function loadMealHistory() {
         if (!user) return;
         setLoadingHistory(true);
@@ -74,37 +71,41 @@ export default function CommunityPage() {
         setShowMealPicker(true);
     }
 
-    function handleShareMealPlan(entry: { date: string; plan: DailyMealPlan }) {
+    async function handleShareMealPlan(entry: { date: string; plan: DailyMealPlan }) {
         const meals = MEALS_LIST.map(type => {
             const m = (entry.plan as any)[type];
             return m ? { type, name: m.name, calories: m.calories } : null;
         }).filter(Boolean) as { type: string; name: string; calories: number }[];
 
         const dateLabel = new Date(entry.date + "T00:00:00").toLocaleDateString("en", { weekday: "long", month: "short", day: "numeric" });
-        const post: Post = {
+        const post: CommunityPost = {
             id: Date.now().toString(),
-            author: profile?.name || "You",
+            author: sanitize(profile?.name || "You"),
             authorAvatar: profile?.name?.charAt(0) || "U",
-            content: `🍽 Sharing my meal plan for ${dateLabel}! Total: ${entry.plan.totalCalories || 0} kcal`,
+            authorUid: user?.uid || "",
+            content: sanitize(`Sharing my meal plan for ${dateLabel}! Total: ${entry.plan.totalCalories || 0} kcal`),
             type: "meal_plan",
             mealPlan: { date: entry.date, meals },
-            likes: 0, comments: [], timestamp: new Date().toISOString(), liked: false,
+            likes: 0, likedBy: [], comments: [], timestamp: new Date().toISOString(),
         };
         setPosts(prev => [post, ...prev]);
+        await saveCommunityPost(post);
         setShowMealPicker(false);
     }
 
-    function handleShareAchievement(ach: { title: string; icon: string }) {
-        const post: Post = {
+    async function handleShareAchievement(ach: { title: string; icon: string }) {
+        const post: CommunityPost = {
             id: Date.now().toString(),
-            author: profile?.name || "You",
+            author: sanitize(profile?.name || "You"),
             authorAvatar: profile?.name?.charAt(0) || "U",
-            content: `🏆 Just unlocked "${ach.title}"!`,
+            authorUid: user?.uid || "",
+            content: sanitize(`Just unlocked "${ach.title}"!`),
             type: "achievement",
             achievement: ach,
-            likes: 0, comments: [], timestamp: new Date().toISOString(), liked: false,
+            likes: 0, likedBy: [], comments: [], timestamp: new Date().toISOString(),
         };
         setPosts(prev => [post, ...prev]);
+        await saveCommunityPost(post);
         setShowAchievementPicker(false);
     }
 
@@ -116,27 +117,53 @@ export default function CommunityPage() {
         reader.readAsDataURL(file);
     }
 
-    function handleLike(postId: string) {
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: p.liked ? p.likes - 1 : p.likes + 1, liked: !p.liked } : p));
+    async function handleLike(postId: string) {
+        const uid = user?.uid || "";
+        setPosts(prev => prev.map(p => {
+            if (p.id !== postId) return p;
+            const alreadyLiked = p.likedBy?.includes(uid);
+            return {
+                ...p,
+                likes: alreadyLiked ? p.likes - 1 : p.likes + 1,
+                likedBy: alreadyLiked ? (p.likedBy || []).filter(u => u !== uid) : [...(p.likedBy || []), uid],
+            };
+        }));
+        const post = posts.find(p => p.id === postId);
+        if (post) {
+            const alreadyLiked = post.likedBy?.includes(uid);
+            await updateCommunityPost(postId, {
+                likes: alreadyLiked ? post.likes - 1 : post.likes + 1,
+                likedBy: alreadyLiked ? (post.likedBy || []).filter(u => u !== uid) : [...(post.likedBy || []), uid],
+            });
+        }
     }
 
-    function handleComment(postId: string) {
-        const text = commentInput[postId]?.trim();
+    async function handleComment(postId: string) {
+        const text = sanitize(commentInput[postId] || "");
         if (!text) return;
-        const comment: Comment = { id: Date.now().toString(), author: profile?.name || "You", content: text, timestamp: new Date().toISOString() };
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: [...p.comments, comment] } : p));
+        const comment: Comment = { id: Date.now().toString(), author: sanitize(profile?.name || "You"), content: text, timestamp: new Date().toISOString() };
+        const post = posts.find(p => p.id === postId);
+        const updatedComments = [...(post?.comments || []), comment];
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: updatedComments } : p));
         setCommentInput(prev => ({ ...prev, [postId]: "" }));
+        await updateCommunityPost(postId, { comments: updatedComments });
     }
 
-    function handleNewPost() {
-        if (!newPost.trim() && !pendingImage) return;
-        const post: Post = {
-            id: Date.now().toString(), author: profile?.name || "You", authorAvatar: profile?.name?.charAt(0) || "U",
-            content: newPost.trim(), type: pendingImage ? "photo" : "text",
+    async function handleNewPost() {
+        const cleanContent = sanitize(newPost);
+        if (!cleanContent && !pendingImage) return;
+        const post: CommunityPost = {
+            id: Date.now().toString(),
+            author: sanitize(profile?.name || "You"),
+            authorAvatar: profile?.name?.charAt(0) || "U",
+            authorUid: user?.uid || "",
+            content: cleanContent,
+            type: pendingImage ? "photo" : "text",
             imageUrl: pendingImage || undefined,
-            likes: 0, comments: [], timestamp: new Date().toISOString(), liked: false,
+            likes: 0, likedBy: [], comments: [], timestamp: new Date().toISOString(),
         };
         setPosts(prev => [post, ...prev]);
+        await saveCommunityPost(post);
         setNewPost("");
         setPendingImage(null);
     }
@@ -335,8 +362,8 @@ export default function CommunityPage() {
                                 {/* Actions */}
                                 <div className="flex items-center gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
                                     <button onClick={() => handleLike(post.id)}
-                                        className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${post.liked ? "text-red-500" : "text-slate-400 hover:text-red-500"}`}>
-                                        {post.liked ? "❤️" : "🤍"} {post.likes}
+                                        className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${post.likedBy?.includes(user?.uid || "") ? "text-red-500" : "text-slate-400 hover:text-red-500"}`}>
+                                        {post.likedBy?.includes(user?.uid || "") ? "❤️" : "🤍"} {post.likes}
                                     </button>
                                     <button onClick={() => toggleComments(post.id)}
                                         className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-blue-500 transition-colors">
