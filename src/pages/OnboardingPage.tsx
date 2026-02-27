@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { updateUserProfile } from "../lib/firestore";
 import { generateFoodiePersonality } from "../lib/gemini";
 import type { FoodieProfile } from "../lib/types";
-import { sanitize, validateOnboarding } from "../lib/validation";
+import { sanitize, validatePersonalInfo, validateBudget } from "../lib/validation";
 
 const STEPS = ["Personal Info", "Lifestyle", "Diet & Cuisine", "Cooking & Spice", "Medical", "Budget & Access", "Foodie Quiz"];
 
@@ -125,21 +125,11 @@ export default function OnboardingPage() {
 
     async function handleFinish() {
         if (!user) return;
+        setSaving(true);
         const h = parseFloat(height) || 170; const w = parseFloat(weight) || 70;
         const parsedAge = parseInt(age) || 25;
         const wBudget = parseFloat(weeklyBudget) || 1500;
         const mBudget = parseFloat(monthlyBudget) || 6000;
-
-        // Validate inputs
-        const errors = validateOnboarding({ age: parsedAge, weight: w, height: h, gender: gender || "other", weeklyBudget: wBudget, monthlyBudget: mBudget });
-        if (errors.length > 0) {
-            setValidationErrors(errors.map(e => e.message));
-            setSaving(false);
-            return;
-        }
-        setValidationErrors([]);
-        setSaving(true);
-
         const bmi = +(w / ((h / 100) ** 2)).toFixed(1);
         const cleanName = sanitize(name) || "User";
         await updateUserProfile(user.uid, {
@@ -163,6 +153,34 @@ export default function OnboardingPage() {
             ...(foodieResult ? { foodieProfile: { ...foodieResult, completedAt: new Date().toISOString() } } : {}),
         });
         await refreshProfile(); navigate("/dashboard");
+    }
+
+    /** Validate before allowing Continue on steps with user input */
+    function handleContinue() {
+        if (step === 0) {
+            const errors = validatePersonalInfo({
+                age: parseInt(age) || 0,
+                weight: parseFloat(weight) || 0,
+                height: parseFloat(height) || 0,
+                gender: gender || "other",
+            });
+            if (errors.length > 0) {
+                setValidationErrors(errors.map(e => e.message));
+                return;
+            }
+        }
+        if (step === 5) {
+            const errors = validateBudget({
+                weeklyBudget: parseFloat(weeklyBudget) || 0,
+                monthlyBudget: parseFloat(monthlyBudget) || 0,
+            });
+            if (errors.length > 0) {
+                setValidationErrors(errors.map(e => e.message));
+                return;
+            }
+        }
+        setValidationErrors([]);
+        setStep(s => s + 1);
     }
 
     const canNext = () => {
@@ -422,7 +440,7 @@ export default function OnboardingPage() {
                         ← Back
                     </button>
                     {step < STEPS.length - 1 ? (
-                        <button type="button" onClick={() => setStep(s => s + 1)} disabled={!canNext()}
+                        <button type="button" onClick={handleContinue} disabled={!canNext()}
                             className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors shadow-md shadow-green-600/20 disabled:opacity-40">
                             Continue →
                         </button>
