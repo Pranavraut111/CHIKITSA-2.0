@@ -154,6 +154,17 @@ export async function savePetState(uid: string, pet: PetState) {
     await setDoc(doc(db, "users", uid, "gameState", "pet"), pet);
 }
 
+/* ═══════════════════ USER LEVEL PERSISTENCE ═══════════════════ */
+
+export async function saveUserLevel(uid: string, level: number, xp: number) {
+    await setDoc(doc(db, "users", uid, "gameState", "userLevel"), { level, xp, updatedAt: new Date().toISOString() });
+}
+
+export async function getUserLevel(uid: string): Promise<{ level: number; xp: number } | null> {
+    const snap = await getDoc(doc(db, "users", uid, "gameState", "userLevel"));
+    return snap.exists() ? (snap.data() as { level: number; xp: number }) : null;
+}
+
 /* ═══════════════════ SHARED PLANS ═══════════════════ */
 
 export async function sharePublicPlan(plan: SharedPlan) {

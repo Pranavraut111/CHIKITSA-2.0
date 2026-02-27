@@ -84,6 +84,14 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
                 lvl++;
             }
             setUserLevel(lvl);
+            // Persist to Firestore
+            if (user) {
+                savePetState(user.uid, { ...pet, xp: pet.xp + amount }).catch(() => { });
+                // Save user level separately in gameState
+                import("../lib/firestore").then(({ saveUserLevel }) => {
+                    saveUserLevel(user.uid, lvl, newXP).catch(() => { });
+                });
+            }
             return newXP;
         });
     }
@@ -99,6 +107,14 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
         setUnlockedIds(new Set(achs.filter(a => a.unlockedAt).map(a => a.id)));
         setChallenges(chs);
         if (petData) setPet(petData);
+
+        // Load persisted user level + XP
+        const { getUserLevel } = await import("../lib/firestore");
+        const saved = await getUserLevel(user.uid);
+        if (saved) {
+            setUserLevel(saved.level);
+            setUserXP(saved.xp);
+        }
 
         // Calculate streak
         const logs = await getFoodLogs(user.uid);
