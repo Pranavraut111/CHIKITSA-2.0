@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useGamification, ACHIEVEMENT_DEFS } from "../contexts/GamificationContext";
+import VirtualPet from "../components/VirtualPet";
 
 export default function AchievementsPage() {
     const { unlockedIds, achievements } = useGamification();
@@ -84,6 +85,9 @@ export default function AchievementsPage() {
                     );
                 })}
             </div>
+
+            {/* Virtual Pet - Chompy lives here */}
+            <VirtualPet />
         </div>
     );
 }

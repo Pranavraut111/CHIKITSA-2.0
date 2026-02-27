@@ -159,7 +159,7 @@ export default function CommunityPage() {
         return `${Math.floor(hrs / 24)}d ago`;
     }
 
-    const unlockedAchievements = achievements.filter(a => a.unlocked);
+    const unlockedAchievements = achievements.filter(a => a.unlockedAt);
 
     return (
         <div className="max-w-3xl mx-auto space-y-6">

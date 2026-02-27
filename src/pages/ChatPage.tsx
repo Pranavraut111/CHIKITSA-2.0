@@ -65,21 +65,24 @@ export default function ChatPage() {
             const cleaned = raw.replace(/```json\n?|```\n?/g, "").trim();
             const nutrition = JSON.parse(cleaned);
 
-            // Build a readable response
-            let response = `## 🍽 Food Analysis\n\n`;
+            // Build plain-text readable response (no markdown formatting)
+            let response = `Food Analysis\n\n`;
             if (nutrition.items && nutrition.items.length > 0) {
                 nutrition.items.forEach((item: any) => {
-                    response += `**${item.item}** (${item.serving || "1 serving"})\n`;
-                    response += `• Calories: ${item.calories} kcal\n`;
-                    response += `• Protein: ${item.protein}g | Carbs: ${item.carbs}g | Fats: ${item.fats}g\n`;
-                    if (item.fiber) response += `• Fiber: ${item.fiber}g`;
-                    if (item.sugar) response += ` | Sugar: ${item.sugar}g`;
+                    response += `${item.item} (${item.serving || "1 serving"})\n`;
+                    response += `  Calories: ${item.calories} kcal\n`;
+                    response += `  Protein: ${item.protein}g · Carbs: ${item.carbs}g · Fats: ${item.fats}g\n`;
+                    if (item.fiber) response += `  Fiber: ${item.fiber}g`;
+                    if (item.sugar) response += ` · Sugar: ${item.sugar}g`;
                     response += "\n\n";
                 });
             }
-            response += `---\n**Total: ${nutrition.totalCalories} kcal** (P: ${nutrition.totalProtein}g | C: ${nutrition.totalCarbs}g | F: ${nutrition.totalFats}g)\n`;
-            response += `**Health Score: ${"⭐".repeat(Math.min(nutrition.healthScore || 5, 10))}** (${nutrition.healthScore}/10)\n\n`;
-            response += nutrition.summary || "";
+            response += `────────────\n`;
+            response += `Total: ${nutrition.totalCalories} kcal (P: ${nutrition.totalProtein}g · C: ${nutrition.totalCarbs}g · F: ${nutrition.totalFats}g)\n`;
+            response += `Health Score: ${nutrition.healthScore}/10\n\n`;
+            if (nutrition.healthAdvice) response += `Health Advice: ${nutrition.healthAdvice}\n\n`;
+            if (nutrition.consumptionTip) response += `How much to eat: ${nutrition.consumptionTip}\n\n`;
+            if (nutrition.summary) response += nutrition.summary;
 
             const aiMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(), role: "assistant", content: response, timestamp: new Date().toISOString(),
@@ -173,7 +176,7 @@ export default function ChatPage() {
                             {msg.imageUrl && (
                                 <img src={msg.imageUrl} alt="Food" className="rounded-xl mb-2 max-h-48 object-cover w-full" />
                             )}
-                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                            <div className="whitespace-pre-wrap">{msg.content.replace(/\*\*(.*?)\*\*/g, '$1').replace(/^#{1,3}\s*/gm, '').replace(/^---$/gm, '────────────')}</div>
                             {msg.nutritionData && <NutritionCard data={msg.nutritionData} />}
                         </div>
                     </div>

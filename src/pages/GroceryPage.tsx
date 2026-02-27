@@ -9,10 +9,10 @@ const MEALS = ["breakfast", "lunch", "dinner", "snack"] as const;
 const MEAL_ICONS: Record<string, string> = { breakfast: "🌅", lunch: "☀️", dinner: "🌙", snack: "🍿" };
 
 const ECOMM_LINKS = [
-    { id: "amazon", label: "Amazon", icon: "📦", baseUrl: "https://www.amazon.in/s?k=", color: "text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30" },
-    { id: "blinkit", label: "Blinkit", icon: "⚡", baseUrl: "https://blinkit.com/s/?q=", color: "text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-950/30" },
-    { id: "zepto", label: "Zepto", icon: "🚀", baseUrl: "https://www.zeptonow.com/search?query=", color: "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/30" },
-    { id: "bigbasket", label: "BigBasket", icon: "🧺", baseUrl: "https://www.bigbasket.com/ps/?q=", color: "text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30" },
+    { id: "amazon", label: "Amazon", baseUrl: "https://www.amazon.in/s?k=", color: "text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30" },
+    { id: "blinkit", label: "Blinkit", baseUrl: "https://blinkit.com/s/?q=", color: "text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-950/30" },
+    { id: "zepto", label: "Zepto", baseUrl: "https://www.zeptonow.com/search?query=", color: "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/30" },
+    { id: "bigbasket", label: "BB", baseUrl: "https://www.bigbasket.com/ps/?q=", color: "text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30" },
 ];
 
 export default function GroceryPage() {
@@ -167,9 +167,9 @@ export default function GroceryPage() {
                                         <div className="flex gap-1 shrink-0">
                                             {ECOMM_LINKS.map(link => (
                                                 <button key={link.id} onClick={() => openSearch(link, item.name)}
-                                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] transition-colors ${link.color}`}
+                                                    className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition-colors ${link.color}`}
                                                     title={`Buy on ${link.label}`}>
-                                                    {link.icon}
+                                                    {link.label}
                                                 </button>
                                             ))}
                                         </div>

@@ -47,21 +47,27 @@ Return ONLY a valid JSON object (no markdown, no explanation) with this exact st
 /** Generate a grocery list JSON from meal plan JSON and weekly budget (INR) */
 export async function generateGroceryList(mealsJson: string, weeklyBudget: number): Promise<string> {
     const prompt = `You are CHIKITSA, an expert Indian nutritionist and grocery planner AI.
-Based on the following meal plan, generate a consolidated grocery list for the week.
+Based on the following SELECTED meals (not a full week — just these specific meals), generate a practical grocery list.
 
-Meal Plan:
+IMPORTANT RULES:
+- Quantities must be REALISTIC for the specific meals listed. For example: if a recipe needs 1 onion, write "1 medium (150g)", NOT "1kg".
+- Do NOT give bulk/weekly quantities. Give exact amounts needed for cooking these meals ONCE.
+- Common sense: a cheela recipe needs 100g dal, not 500g. A curry needs 2 tomatoes, not 1kg.
+- Consolidate duplicate ingredients across meals but keep quantities realistic (add them up sensibly).
+
+Selected Meals:
 ${mealsJson}
 
-Weekly Budget: ₹${weeklyBudget}
+Budget: ₹${weeklyBudget}
 
 Return ONLY a valid JSON array (no markdown, no explanation) with this exact structure:
 [
-  { "name": "Item name", "quantity": "500g", "estimatedPrice": 50, "category": "Vegetables", "purchased": false },
+  { "name": "Item name", "quantity": "2 medium (200g)", "estimatedPrice": 15, "category": "Vegetables", "purchased": false },
   ...
 ]
 
 Categories: "Vegetables", "Fruits", "Dairy", "Grains", "Proteins", "Spices & Condiments", "Beverages", "Snacks", "Other"
-estimatedPrice should be in INR (₹). Only return the JSON array, nothing else.`;
+estimatedPrice should be in INR (₹) and should be realistic Indian market prices. Only return the JSON array, nothing else.`;
 
     const result = await model.generateContent(prompt);
     return result.response.text();
@@ -153,7 +159,7 @@ Make it DIFFERENT from the current ${mealType}. Match the user's preferences. On
 export async function analyzeImageNutrition(imageBase64: string, mimeType: string): Promise<string> {
     const visionModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const prompt = `You are CHIKITSA, an expert food and nutrition analyst.
+    const prompt = `You are CHIKITSA, an expert food and nutrition analyst AND health advisor.
 Analyze this food image carefully and identify every food item visible.
 
 Return ONLY a valid JSON object (no markdown, no explanation) with this structure:
@@ -175,10 +181,14 @@ Return ONLY a valid JSON object (no markdown, no explanation) with this structur
   "totalCarbs": 30,
   "totalFats": 12,
   "summary": "A brief 1-2 sentence health assessment of this food",
-  "healthScore": 7
+  "healthScore": 7,
+  "healthAdvice": "Is this food good or bad for you? Explain briefly considering the overall balance of macros, oil/sugar content, and nutritional value. Be honest — if it's unhealthy, say so.",
+  "consumptionTip": "How much of this should a healthy adult eat? E.g. '1 bowl of chole is fine, but limit pooris to 1-2 instead of 3-4 to reduce refined carbs and oil intake. Pair with a salad for better nutrition.'"
 }
 
 - healthScore is 1-10 (10 = extremely healthy)
+- healthAdvice should be practical and honest (e.g. 'This is high in saturated fat due to deep frying' or 'Great source of protein and fiber')
+- consumptionTip should give specific actionable quantities the person should eat, not vague advice
 - Be accurate with Indian food items especially
 - All macros in grams, calories in kcal
 - Only return the JSON, nothing else.`;
