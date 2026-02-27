@@ -159,7 +159,7 @@ export default function CommunityPage() {
             authorUid: user?.uid || "",
             content: cleanContent,
             type: pendingImage ? "photo" : "text",
-            imageUrl: pendingImage || undefined,
+            ...(pendingImage ? { imageUrl: pendingImage } : {}),
             likes: 0, likedBy: [], comments: [], timestamp: new Date().toISOString(),
         };
         setPosts(prev => [post, ...prev]);

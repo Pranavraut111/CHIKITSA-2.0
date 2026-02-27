@@ -196,7 +196,15 @@ export interface CommunityPost {
 }
 
 export async function saveCommunityPost(post: CommunityPost) {
-    await setDoc(doc(db, "communityPosts", post.id), post);
+    try {
+        // Firestore rejects undefined values — strip them before write
+        const cleanPost = JSON.parse(JSON.stringify(post));
+        await setDoc(doc(db, "communityPosts", post.id), cleanPost);
+        console.log("Community post saved:", post.id);
+    } catch (err) {
+        console.error("Failed to save community post:", err);
+        throw err;
+    }
 }
 
 export async function getCommunityPosts(): Promise<CommunityPost[]> {
