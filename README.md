@@ -52,7 +52,7 @@ Share meal plans, achievements, and food photos. Like and comment on posts. All 
 | Auth | Firebase Authentication (Google + Email) |
 | Database | Cloud Firestore |
 | Animations | Framer Motion |
-| Styling | Vanilla CSS (dark mode supported) |
+| Styling | Tailwind CSS (dark mode supported) |
 
 ---
 
