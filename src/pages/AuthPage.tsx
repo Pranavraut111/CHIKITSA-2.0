@@ -102,7 +102,7 @@ export default function AuthPage() {
                                 <p className="text-slate-400 text-sm">
                                     {isLogin
                                         ? "Sign in to access your personalized nutrition plan."
-                                        : "Join 50K+ people improving their health with AI."}
+                                        : "Personalized AI-powered nutrition, just for you."}
                                 </p>
                             </div>
 
@@ -296,18 +296,18 @@ export default function AuthPage() {
                     <div className="relative z-10 px-10 pb-8">
                         <div className="flex gap-8 border-t border-white/[0.08] pt-6">
                             <div>
-                                <div className="text-2xl font-black text-white">50K+</div>
-                                <div className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">Users</div>
+                                <div className="text-2xl font-black text-white">30+</div>
+                                <div className="text-[10px] uppercase tracking-wider text-emerald-200 font-semibold">Parameters</div>
                             </div>
                             <div className="w-px bg-white/[0.08]" />
                             <div>
-                                <div className="text-2xl font-black text-green-400">98%</div>
-                                <div className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">Satisfaction</div>
+                                <div className="text-2xl font-black text-green-400">AI</div>
+                                <div className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">Adaptive</div>
                             </div>
                             <div className="w-px bg-white/[0.08]" />
                             <div>
-                                <div className="text-2xl font-black text-emerald-300">2M+</div>
-                                <div className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">Meals Planned</div>
+                                <div className="text-2xl font-black text-emerald-300">24/7</div>
+                                <div className="text-[10px] text-slate-500 mt-0.5 uppercase tracking-widest font-bold">AI Coach</div>
                             </div>
                         </div>
                     </div>

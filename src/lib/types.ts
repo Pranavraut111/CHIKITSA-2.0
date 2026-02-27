@@ -14,7 +14,7 @@ export interface UserProfile {
     sleepSchedule: string;
     workRoutine: string;
     mealFrequency: number;
-    dietType: "vegetarian" | "non_vegetarian" | "vegan" | "eggetarian";
+    dietType: "vegetarian" | "non_vegetarian" | "vegan" | "eggetarian" | "anything";
     allergies: string[];
     foodDislikes: string[];
     cuisinePreference: string[];
@@ -22,6 +22,12 @@ export interface UserProfile {
     weeklyBudget: number;
     monthlyBudget: number;
     location: string;
+    cookingSkill: "beginner" | "intermediate" | "advanced";
+    spiceTolerance: "none" | "mild" | "medium" | "spicy" | "extra_spicy";
+    mealTimings: string;
+    waterGoal: number;
+    culturalRestrictions: string[];
+    groceryAccess: "supermarket" | "local_market" | "online" | "limited";
     onboardingComplete: boolean;
     foodieProfile?: FoodieProfile;
     createdAt: string;
@@ -81,6 +87,17 @@ export interface ChatMessage {
     role: "user" | "assistant";
     content: string;
     timestamp: string;
+    imageUrl?: string;
+    nutritionData?: {
+        item: string;
+        calories: number;
+        protein: number;
+        carbs: number;
+        fats: number;
+        fiber?: number;
+        sugar?: number;
+        serving?: string;
+    };
 }
 
 /* ═══════════ Gamification Types ═══════════ */

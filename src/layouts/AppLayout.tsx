@@ -13,16 +13,15 @@ const NAV = [
     { href: "/map", label: "Nearby Stores", d: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" },
     { href: "/log", label: "Food Log", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" },
     { href: "/chat", label: "AI Chat", d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" },
-    { href: "/progress", label: "Progress", d: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
     { href: "/achievements", label: "Achievements", d: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" },
-    { href: "/challenges", label: "Challenges", d: "M13 10V3L4 14h7v7l9-11h-7z" },
+    { href: "/community", label: "Community", d: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" },
     { href: "/profile", label: "Profile", d: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
 ];
 
 export default function AppLayout() {
     const { user, profile, loading, logout } = useAuth();
     const { theme, toggle } = useTheme();
-    const { pet, streak } = useGamification();
+    const { streak, userLevel, userXP } = useGamification();
     const navigate = useNavigate();
     const location = useLocation();
     const pathname = location.pathname;
@@ -89,14 +88,15 @@ export default function AppLayout() {
 
             {/* Bottom */}
             <div className="px-2.5 pb-3 space-y-1 border-t border-slate-100 dark:border-slate-800 pt-2">
-                {/* Pet mini widget */}
-                <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-100 dark:border-purple-900">
-                    <span className="text-lg">🐾</span>
+                {/* User Level widget */}
+                <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-100 dark:border-green-900">
+                    <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center text-xs font-black text-white shadow-sm">{userLevel}</div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold text-purple-700 dark:text-purple-400">{pet.name} Lv.{pet.level}</p>
-                        <div className="w-full h-1 rounded-full bg-purple-200 dark:bg-purple-900 mt-0.5">
-                            <div className="h-full rounded-full bg-purple-500 transition-all" style={{ width: `${pet.happiness}%` }} />
+                        <p className="text-[11px] font-bold text-green-700 dark:text-green-400">Level {userLevel}</p>
+                        <div className="w-full h-1 rounded-full bg-green-200 dark:bg-green-900 mt-0.5">
+                            <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${(userXP / (userLevel * 100)) * 100}%` }} />
                         </div>
+                        <p className="text-[9px] text-green-500 mt-0.5">{userXP}/{userLevel * 100} XP</p>
                     </div>
                 </div>
 

@@ -9,12 +9,13 @@ import MealsPage from "./pages/MealsPage";
 import GroceryPage from "./pages/GroceryPage";
 import ChatPage from "./pages/ChatPage";
 import LogPage from "./pages/LogPage";
-import ProgressPage from "./pages/ProgressPage";
+
 import ProfilePage from "./pages/ProfilePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import MapPage from "./pages/MapPage";
 import AchievementsPage from "./pages/AchievementsPage";
-import ChallengesPage from "./pages/ChallengesPage";
+
+import CommunityPage from "./pages/CommunityPage";
 import LandingPage from "./pages/LandingPage";
 
 function App() {
@@ -33,11 +34,12 @@ function App() {
                 <Route path="/grocery" element={<GroceryPage />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/log" element={<LogPage />} />
-                <Route path="/progress" element={<ProgressPage />} />
+
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/map" element={<MapPage />} />
                 <Route path="/achievements" element={<AchievementsPage />} />
-                <Route path="/challenges" element={<ChallengesPage />} />
+
+                <Route path="/community" element={<CommunityPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

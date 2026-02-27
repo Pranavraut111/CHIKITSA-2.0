@@ -49,10 +49,13 @@ interface GamificationState {
     challenges: Challenge[];
     pet: PetState;
     streak: number;
+    userLevel: number;
+    userXP: number;
     checkAndUnlock: (conditionId: string) => Promise<void>;
     acceptChallenge: (templateIdx: number) => Promise<void>;
     updateChallengeProgress: (challengeId: string, increment: number) => Promise<void>;
     feedPet: () => Promise<void>;
+    addXP: (amount: number) => void;
     refreshGamification: () => Promise<void>;
 }
 
@@ -69,6 +72,21 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
     const [challenges, setChallenges] = useState<Challenge[]>([]);
     const [pet, setPet] = useState<PetState>(DEFAULT_PET);
     const [streak, setStreak] = useState(0);
+    const [userXP, setUserXP] = useState(0);
+    const [userLevel, setUserLevel] = useState(1);
+
+    function addXP(amount: number) {
+        setUserXP(prev => {
+            let newXP = prev + amount;
+            let lvl = userLevel;
+            while (newXP >= lvl * 100) {
+                newXP -= lvl * 100;
+                lvl++;
+            }
+            setUserLevel(lvl);
+            return newXP;
+        });
+    }
 
     const refreshGamification = useCallback(async () => {
         if (!user) return;
@@ -154,8 +172,8 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
 
     return (
         <GamificationContext.Provider value={{
-            achievements, unlockedIds, challenges, pet, streak,
-            checkAndUnlock, acceptChallenge, updateChallengeProgress, feedPet, refreshGamification,
+            achievements, unlockedIds, challenges, pet, streak, userLevel, userXP,
+            checkAndUnlock, acceptChallenge, updateChallengeProgress, feedPet, addXP, refreshGamification,
         }}>
             {children}
         </GamificationContext.Provider>

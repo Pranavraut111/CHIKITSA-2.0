@@ -112,3 +112,85 @@ Only return the JSON, nothing else.`;
     const result = await model.generateContent(prompt);
     return result.response.text();
 }
+
+/** Regenerate a single meal type while keeping the others */
+export async function regenerateSingleMeal(
+    mealType: "breakfast" | "lunch" | "dinner" | "snack",
+    context: string,
+    currentMeals: string
+): Promise<string> {
+    const prompt = `You are CHIKITSA, an expert Indian nutritionist and dietitian AI.
+Regenerate ONLY the ${mealType} meal — the user didn't like the previous suggestion.
+
+User Context:
+${context}
+
+Current meal plan (keep the OTHER meals exactly as-is, ONLY change ${mealType}):
+${currentMeals}
+
+Return ONLY a valid JSON object for the single meal with this structure:
+{
+  "name": "New Dish Name",
+  "ingredients": [{"item": "ingredient", "quantity": "100g"}],
+  "recipe": ["Step 1: ...", "Step 2: ..."],
+  "prepTime": "10 min",
+  "cookTime": "15 min",
+  "calories": 350,
+  "protein": 15,
+  "carbs": 45,
+  "fats": 10,
+  "imageQuery": "dish name food photography",
+  "explanation": "Why this new meal is a great alternative"
+}
+
+Make it DIFFERENT from the current ${mealType}. Match the user's preferences. Only return the JSON, nothing else.`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+}
+
+/** Analyze a food image using Gemini vision and return nutrition data */
+export async function analyzeImageNutrition(imageBase64: string, mimeType: string): Promise<string> {
+    const visionModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    const prompt = `You are CHIKITSA, an expert food and nutrition analyst.
+Analyze this food image carefully and identify every food item visible.
+
+Return ONLY a valid JSON object (no markdown, no explanation) with this structure:
+{
+  "items": [
+    {
+      "item": "Food item name",
+      "calories": 250,
+      "protein": 8,
+      "carbs": 30,
+      "fats": 12,
+      "fiber": 3,
+      "sugar": 5,
+      "serving": "1 piece (approx 150g)"
+    }
+  ],
+  "totalCalories": 250,
+  "totalProtein": 8,
+  "totalCarbs": 30,
+  "totalFats": 12,
+  "summary": "A brief 1-2 sentence health assessment of this food",
+  "healthScore": 7
+}
+
+- healthScore is 1-10 (10 = extremely healthy)
+- Be accurate with Indian food items especially
+- All macros in grams, calories in kcal
+- Only return the JSON, nothing else.`;
+
+    const result = await visionModel.generateContent([
+        prompt,
+        {
+            inlineData: {
+                mimeType,
+                data: imageBase64,
+            },
+        },
+    ]);
+    return result.response.text();
+}

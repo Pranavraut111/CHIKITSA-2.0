@@ -58,6 +58,29 @@ export async function getMealPlan(uid: string, date: string): Promise<DailyMealP
     return snap.exists() ? (snap.data() as DailyMealPlan) : null;
 }
 
+export async function getMealPlanHistory(uid: string, days: number = 7): Promise<{ date: string; plan: DailyMealPlan }[]> {
+    const results: { date: string; plan: DailyMealPlan }[] = [];
+    for (let i = 0; i < days; i++) {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const ds = d.toISOString().split("T")[0];
+        const plan = await getMealPlan(uid, ds);
+        if (plan) results.push({ date: ds, plan });
+    }
+    return results;
+}
+
+export async function logMealFromPlan(uid: string, mealType: string, meal: any) {
+    await addDoc(collection(db, "users", uid, "foodLogs"), {
+        meal: mealType,
+        description: meal.name,
+        calories: meal.calories || 0,
+        protein: meal.protein || 0,
+        carbs: meal.carbs || 0,
+        fats: meal.fats || 0,
+        timestamp: new Date().toISOString(),
+    });
+}
+
 /* ═══════════════════ FOOD LOGS ═══════════════════ */
 
 export async function addFoodLog(uid: string, log: Omit<FoodLog, "id">) {

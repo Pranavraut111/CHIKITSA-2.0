@@ -54,10 +54,10 @@ const NAV_LINKS = ["Home", "About", "Features", "How It Works", "Contact"];
 
 /* ═══════════════════ STATS ═══════════════════ */
 const STATS = [
-    { value: "50K+", label: "Plans Generated" },
-    { value: "98%", label: "User Satisfaction" },
+    { value: "30+", label: "Parameters Analyzed" },
+    { value: "AI", label: "Adaptive Engine" },
     { value: "200+", label: "Conditions Supported" },
-    { value: "15+", label: "Countries" },
+    { value: "24/7", label: "AI Coach Access" },
 ];
 
 /* ═══════════════════ FEATURES ═══════════════════ */
