@@ -19,7 +19,7 @@ type Mood = "idle" | "happy" | "sleeping" | "excited";
 
 export default function VirtualPet() {
     const { userLevel, pet } = useGamification();
-    const [pos, setPos] = useState({ x: 80, y: 80 });
+    const [pos, setPos] = useState({ x: Math.random() * (window.innerWidth - 200) + 100, y: Math.random() * (window.innerHeight - 200) + 100 });
     const [mood, setMood] = useState<Mood>("idle");
     const [direction, setDirection] = useState(1); // 1 = right, -1 = left
     const [showBubble, setShowBubble] = useState(false);
@@ -31,23 +31,38 @@ export default function VirtualPet() {
     const earColor = pet.happiness > 70 ? "bg-amber-500" : pet.happiness > 40 ? "bg-amber-400" : "bg-amber-300";
     const tailColor = earColor;
 
-    // Roaming movement
+    // Roaming movement — explores entire viewport
     useEffect(() => {
         if (!isUnlocked) return;
+
+        // Small steps every 3 seconds
         intervalRef.current = window.setInterval(() => {
             setPos(prev => {
                 const maxX = window.innerWidth - 100;
                 const maxY = window.innerHeight - 100;
-                const dx = (Math.random() - 0.5) * 60;
-                const dy = (Math.random() - 0.5) * 30;
+                const dx = (Math.random() - 0.5) * 200;
+                const dy = (Math.random() - 0.5) * 100;
                 const newX = Math.max(20, Math.min(maxX, prev.x + dx));
                 const newY = Math.max(60, Math.min(maxY, prev.y + dy));
                 setDirection(dx > 0 ? 1 : -1);
                 return { x: newX, y: newY };
             });
-        }, 4000);
+        }, 3000);
 
-        return () => clearInterval(intervalRef.current);
+        // Big jump every 12 seconds — teleport to a random spot
+        const jumpTimer = window.setInterval(() => {
+            const maxX = window.innerWidth - 100;
+            const maxY = window.innerHeight - 100;
+            const newX = Math.random() * maxX + 20;
+            const newY = Math.random() * (maxY - 60) + 60;
+            setDirection(Math.random() > 0.5 ? 1 : -1);
+            setPos({ x: newX, y: newY });
+        }, 12000);
+
+        return () => {
+            clearInterval(intervalRef.current);
+            clearInterval(jumpTimer);
+        };
     }, [isUnlocked]);
 
     // Mood cycling

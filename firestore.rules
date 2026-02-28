@@ -3,6 +3,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // User profile and all subcollections (mealPlans, foodLogs, etc.)
+    // Any authenticated user can read basic profile data (for leaderboard)
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
@@ -15,7 +20,23 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.authorUid;
     }
 
-    // Shared meal plans — any authenticated user can read, only author can write
+    // Friend requests — authenticated users can read/write
+    match /friendRequests/{requestId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Community challenges — any authenticated user can read/write
+    match /communityChallenges/{challengeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.creatorUid;
+    }
+
+    // Shared meal plans
     match /sharedPlans/{planId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;

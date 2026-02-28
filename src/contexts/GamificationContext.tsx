@@ -22,6 +22,15 @@ export const ACHIEVEMENT_DEFS: Omit<Achievement, "unlockedAt">[] = [
     { id: "first_log", title: "First Steps", description: "Log your first meal", icon: "👣", condition: "first_log" },
     { id: "budget_boss", title: "Budget Boss", description: "Stay under weekly budget 4 weeks in a row", icon: "💰", condition: "4_week_budget" },
     { id: "social_butterfly", title: "Social Butterfly", description: "Share your first meal plan", icon: "🦋", condition: "first_share" },
+    // New achievements
+    { id: "salad_champion", title: "Salad Champion", description: "Eat salads 5 days in a row", icon: "🥗", condition: "5_day_salad" },
+    { id: "snap_master", title: "Snap Master", description: "Scan 10 food photos with AI", icon: "📸", condition: "10_scans" },
+    { id: "night_owl", title: "Night Owl Planner", description: "Generate a meal plan after 10 PM", icon: "🌙", condition: "late_plan" },
+    { id: "community_star", title: "Community Star", description: "Get 10 likes on your community posts", icon: "🤝", condition: "10_likes" },
+    { id: "workout_fuel", title: "Workout Fuel", description: "Log pre/post workout meals 5 times", icon: "🏃", condition: "5_workout_meals" },
+    { id: "consistency_king", title: "Consistency King", description: "Log meals every day for 14 days straight", icon: "🎯", condition: "14_day_streak" },
+    { id: "top_chef", title: "Top Chef", description: "Try recipes from 5 different cuisines", icon: "🥇", condition: "5_cuisines" },
+    { id: "diamond_logger", title: "Diamond Logger", description: "Log 100 total meals — you're unstoppable!", icon: "💎", condition: "100_logs" },
 ];
 
 /* ═══════════ Challenge Templates ═══════════ */
@@ -118,7 +127,16 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
 
         // Calculate streak
         const logs = await getFoodLogs(user.uid);
-        setStreak(calculateStreak(logs));
+        const calculatedStreak = calculateStreak(logs);
+        setStreak(calculatedStreak);
+
+        // Sync leaderboard stats to user profile
+        const { updateLeaderboardStats } = await import("../lib/firestore");
+        updateLeaderboardStats(user.uid, {
+            level: saved?.level || 1,
+            xp: saved?.xp || 0,
+            streak: calculatedStreak,
+        }).catch(() => { });
     }, [user]);
 
     useEffect(() => {

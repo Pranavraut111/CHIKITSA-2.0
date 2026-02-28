@@ -3,12 +3,14 @@ import {
     getDoc,
     setDoc,
     updateDoc,
+    deleteDoc,
     collection,
     addDoc,
     getDocs,
     query,
     orderBy,
     limit,
+    where,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type {
@@ -224,4 +226,167 @@ export async function getCommunityPosts(): Promise<CommunityPost[]> {
 
 export async function updateCommunityPost(postId: string, updates: Partial<CommunityPost>) {
     await updateDoc(doc(db, "communityPosts", postId), updates as Record<string, unknown>);
+}
+
+/* ═══════════════════ LEADERBOARD ═══════════════════ */
+
+export interface LeaderboardEntry {
+    uid: string;
+    name: string;
+    level: number;
+    xp: number;
+    streak: number;
+    avatarLetter: string;
+}
+
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+    try {
+        const snap = await getDocs(collection(db, "users"));
+        const entries: LeaderboardEntry[] = [];
+        snap.docs.forEach(d => {
+            const data = d.data();
+            if (!data.onboardingComplete) return; // skip incomplete profiles
+            // Read level/XP from gameState subcollection or from profile
+            entries.push({
+                uid: d.id,
+                name: data.name || "Anonymous",
+                level: data.gameLevel || 1,
+                xp: data.gameXP || 0,
+                streak: data.gameStreak || 0,
+                avatarLetter: (data.name || "A").charAt(0).toUpperCase(),
+            });
+        });
+        // Sort by level desc, then XP desc, then streak desc
+        return entries.sort((a, b) => b.level - a.level || b.xp - a.xp || b.streak - a.streak);
+    } catch (err) {
+        console.error("Failed to load leaderboard:", err);
+        return [];
+    }
+}
+
+/** Update public leaderboard fields on user profile */
+export async function updateLeaderboardStats(uid: string, stats: { level: number; xp: number; streak: number }) {
+    await updateDoc(doc(db, "users", uid), {
+        gameLevel: stats.level,
+        gameXP: stats.xp,
+        gameStreak: stats.streak,
+    });
+}
+
+/* ═══════════════════ FRIEND REQUESTS ═══════════════════ */
+
+export interface FriendRequest {
+    id: string;
+    fromUid: string;
+    fromName: string;
+    toUid: string;
+    status: "pending" | "accepted" | "declined";
+    timestamp: string;
+}
+
+export async function sendFriendRequest(fromUid: string, fromName: string, toUid: string) {
+    const id = `${fromUid}_${toUid}`;
+    // Check if already friends or request exists
+    const existing = await getDoc(doc(db, "friendRequests", id));
+    const reverse = await getDoc(doc(db, "friendRequests", `${toUid}_${fromUid}`));
+    if (existing.exists() || reverse.exists()) return false; // already exists
+    await setDoc(doc(db, "friendRequests", id), {
+        id,
+        fromUid,
+        fromName,
+        toUid,
+        status: "pending",
+        timestamp: new Date().toISOString(),
+    });
+    return true;
+}
+
+export async function acceptFriendRequest(requestId: string) {
+    await updateDoc(doc(db, "friendRequests", requestId), { status: "accepted" });
+}
+
+export async function declineFriendRequest(requestId: string) {
+    await deleteDoc(doc(db, "friendRequests", requestId));
+}
+
+export async function getFriendRequests(uid: string): Promise<FriendRequest[]> {
+    try {
+        const q = query(collection(db, "friendRequests"), where("toUid", "==", uid), where("status", "==", "pending"));
+        const snap = await getDocs(q);
+        return snap.docs.map(d => d.data() as FriendRequest);
+    } catch (err) {
+        console.error("Failed to load friend requests:", err);
+        // Fallback: fetch all and filter client-side
+        const snap = await getDocs(collection(db, "friendRequests"));
+        return snap.docs
+            .map(d => d.data() as FriendRequest)
+            .filter(r => r.toUid === uid && r.status === "pending");
+    }
+}
+
+export async function getFriends(uid: string): Promise<string[]> {
+    try {
+        // Friends are accepted requests in either direction
+        const snap = await getDocs(collection(db, "friendRequests"));
+        const friends: string[] = [];
+        snap.docs.forEach(d => {
+            const data = d.data() as FriendRequest;
+            if (data.status !== "accepted") return;
+            if (data.fromUid === uid) friends.push(data.toUid);
+            if (data.toUid === uid) friends.push(data.fromUid);
+        });
+        return friends;
+    } catch {
+        return [];
+    }
+}
+
+export async function removeFriend(uid1: string, uid2: string) {
+    // Delete both possible request directions
+    try { await deleteDoc(doc(db, "friendRequests", `${uid1}_${uid2}`)); } catch { /* ok */ }
+    try { await deleteDoc(doc(db, "friendRequests", `${uid2}_${uid1}`)); } catch { /* ok */ }
+}
+
+/* ═══════════════════ COMMUNITY CHALLENGES ═══════════════════ */
+
+export interface CommChallenge {
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    target: number;
+    unit: string;
+    difficulty: "Easy" | "Medium" | "Hard";
+    xpReward: number;
+    creatorUid: string;
+    creatorName: string;
+    acceptedBy: string[];
+    timestamp: string;
+}
+
+export async function saveCommunityChallenge(challenge: CommChallenge) {
+    const clean = JSON.parse(JSON.stringify(challenge));
+    await setDoc(doc(db, "communityChallenges", challenge.id), clean);
+}
+
+export async function getCommunityChallenges(): Promise<CommChallenge[]> {
+    try {
+        const snap = await getDocs(collection(db, "communityChallenges"));
+        const challenges = snap.docs.map(d => ({ id: d.id, ...d.data() } as CommChallenge));
+        return challenges.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch (err) {
+        console.error("Failed to load community challenges:", err);
+        return [];
+    }
+}
+
+export async function acceptCommunityChallenge(challengeId: string, uid: string) {
+    const ref = doc(db, "communityChallenges", challengeId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+        const data = snap.data() as CommChallenge;
+        if (!data.acceptedBy.includes(uid)) {
+            await updateDoc(ref, { acceptedBy: [...data.acceptedBy, uid] });
+        }
+    }
 }

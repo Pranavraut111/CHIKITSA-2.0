@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useGamification } from "../contexts/GamificationContext";
-import { getMealPlanHistory, saveCommunityPost, getCommunityPosts, updateCommunityPost } from "../lib/firestore";
-import type { CommunityPost } from "../lib/firestore";
+import {
+    getMealPlanHistory, saveCommunityPost, getCommunityPosts, updateCommunityPost,
+    getLeaderboard, sendFriendRequest, acceptFriendRequest, declineFriendRequest,
+    getFriendRequests, getFriends, saveCommunityChallenge, getCommunityChallenges,
+    acceptCommunityChallenge,
+} from "../lib/firestore";
+import type { CommunityPost, LeaderboardEntry, FriendRequest, CommChallenge } from "../lib/firestore";
 import type { DailyMealPlan } from "../lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { sanitize } from "../lib/validation";
@@ -17,6 +22,17 @@ interface Comment {
 }
 
 const MEALS_LIST = ["breakfast", "lunch", "dinner", "snack"] as const;
+
+const BUILTIN_CHALLENGES = [
+    { title: "No artificial sugar for 2 days", icon: "🚫🍬", target: 2, unit: "days", xpReward: 50, difficulty: "Medium" as const, description: "Avoid added sugars for 48 hours" },
+    { title: "Eat 5 servings of fruit", icon: "🍎", target: 5, unit: "servings", xpReward: 30, difficulty: "Easy" as const, description: "Log 5 fruit servings this week" },
+    { title: "Log every meal for 3 days", icon: "📝", target: 9, unit: "meals", xpReward: 40, difficulty: "Medium" as const, description: "Don't miss a single meal log" },
+    { title: "Try a new cuisine", icon: "🌍", target: 1, unit: "meal", xpReward: 25, difficulty: "Easy" as const, description: "Cook something from a new cuisine" },
+    { title: "Drink 8 glasses of water today", icon: "💧", target: 8, unit: "glasses", xpReward: 20, difficulty: "Easy" as const, description: "Hit 8 glasses today" },
+    { title: "Cook at home for 5 days", icon: "👨‍🍳", target: 5, unit: "days", xpReward: 60, difficulty: "Hard" as const, description: "Home-cooked meals for 5 days" },
+    { title: "Protein power week", icon: "💪", target: 7, unit: "days", xpReward: 55, difficulty: "Medium" as const, description: "Hit protein goals for 7 days" },
+    { title: "Zero junk food day", icon: "🚀", target: 1, unit: "day", xpReward: 15, difficulty: "Easy" as const, description: "No junk food for an entire day" },
+];
 
 export default function CommunityPage() {
     const { user, profile } = useAuth();
@@ -39,15 +55,24 @@ export default function CommunityPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [pendingImage, setPendingImage] = useState<string | null>(null);
 
-    // Challenges
-    const COMMUNITY_CHALLENGES = [
-        { title: "No artificial sugar for 2 days", icon: "🚫🍬", target: 2, unit: "days", xpReward: 50, difficulty: "Medium" },
-        { title: "Eat 5 servings of fruit", icon: "🍎", target: 5, unit: "servings", xpReward: 30, difficulty: "Easy" },
-        { title: "Log every meal for 3 days", icon: "📝", target: 9, unit: "meals", xpReward: 40, difficulty: "Medium" },
-        { title: "Try a new cuisine", icon: "🌍", target: 1, unit: "meal", xpReward: 25, difficulty: "Easy" },
-        { title: "Drink 8 glasses of water today", icon: "💧", target: 8, unit: "glasses", xpReward: 20, difficulty: "Easy" },
-        { title: "Cook at home for 5 days", icon: "👨‍🍳", target: 5, unit: "days", xpReward: 60, difficulty: "Hard" },
-    ];
+    // Leaderboard
+    const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+
+    // Friends
+    const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+    const [friends, setFriends] = useState<string[]>([]);
+    const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
+
+    // Community challenges
+    const [commChallenges, setCommChallenges] = useState<CommChallenge[]>([]);
+    const [showCreateChallenge, setShowCreateChallenge] = useState(false);
+    const [newChTitle, setNewChTitle] = useState("");
+    const [newChDesc, setNewChDesc] = useState("");
+    const [newChTarget, setNewChTarget] = useState("5");
+    const [newChUnit, setNewChUnit] = useState("days");
+    const [newChDifficulty, setNewChDifficulty] = useState<"Easy" | "Medium" | "Hard">("Medium");
+    const [newChIcon, setNewChIcon] = useState("🎯");
 
     // Load posts from Firestore on mount
     useEffect(() => {
@@ -59,6 +84,24 @@ export default function CommunityPage() {
         }
         loadPosts();
     }, []);
+
+    // Load leaderboard and friends when switching tabs
+    useEffect(() => {
+        if (tab === "leaderboard" && leaderboard.length === 0) {
+            setLoadingLeaderboard(true);
+            getLeaderboard().then(entries => { setLeaderboard(entries); setLoadingLeaderboard(false); });
+        }
+        if (tab === "leaderboard" || tab === "feed") {
+            if (user) {
+                getFriendRequests(user.uid).then(setFriendRequests);
+                getFriends(user.uid).then(setFriends);
+            }
+        }
+        if (tab === "challenges" && commChallenges.length === 0) {
+            getCommunityChallenges().then(setCommChallenges);
+        }
+    }, [tab, user]);
+
 
     async function loadMealHistory() {
         if (!user) return;
@@ -407,36 +450,143 @@ export default function CommunityPage() {
                                     <p className="text-base font-bold">{profile?.name || "You"}</p>
                                     <p className="text-xs text-green-200">Level {userLevel} · 🔥 {streak} day streak</p>
                                 </div>
+                                <div className="ml-auto text-right">
+                                    <p className="text-2xl font-black">#{leaderboard.findIndex(e => e.uid === user?.uid) + 1 || "—"}</p>
+                                    <p className="text-[10px] text-green-200">Your Rank</p>
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-8 text-center">
-                            <div className="text-4xl mb-3">🏆</div>
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Leaderboard coming soon</p>
-                            <p className="text-xs text-slate-400">Invite friends to compete and share your progress!</p>
-                        </div>
+
+                        {/* Friend requests */}
+                        {friendRequests.length > 0 && (
+                            <div className="bg-blue-50 dark:bg-blue-950/20 rounded-2xl border border-blue-200 dark:border-blue-800 p-4">
+                                <h3 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-3">
+                                    Friend Requests ({friendRequests.length})
+                                </h3>
+                                <div className="space-y-2">
+                                    {friendRequests.map(req => (
+                                        <div key={req.id} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl p-3">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-sm font-bold text-blue-700 dark:text-blue-400">
+                                                {req.fromName.charAt(0)}
+                                            </div>
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">{req.fromName}</span>
+                                            <button onClick={async () => {
+                                                await acceptFriendRequest(req.id);
+                                                setFriendRequests(prev => prev.filter(r => r.id !== req.id));
+                                                setFriends(prev => [...prev, req.fromUid]);
+                                            }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-green-600 text-white hover:bg-green-700 transition-colors">
+                                                Accept
+                                            </button>
+                                            <button onClick={async () => {
+                                                await declineFriendRequest(req.id);
+                                                setFriendRequests(prev => prev.filter(r => r.id !== req.id));
+                                            }} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 transition-colors">
+                                                Decline
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Rankings */}
+                        {loadingLeaderboard ? (
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border p-8 text-center">
+                                <div className="animate-spin inline-block w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full" />
+                                <p className="text-xs text-slate-400 mt-2">Loading rankings...</p>
+                            </div>
+                        ) : (
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Global Rankings</h3>
+                                </div>
+                                {leaderboard.length === 0 ? (
+                                    <div className="p-8 text-center">
+                                        <div className="text-4xl mb-2">🏆</div>
+                                        <p className="text-sm text-slate-400">No rankings yet — complete onboarding to appear!</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-slate-50 dark:divide-slate-800">
+                                        {leaderboard.map((entry, idx) => {
+                                            const isMe = entry.uid === user?.uid;
+                                            const isFriend = friends.includes(entry.uid);
+                                            const hasSent = sentRequests.has(entry.uid);
+                                            const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
+                                            return (
+                                                <div key={entry.uid}
+                                                    className={`flex items-center gap-3 px-4 py-3 transition-colors ${isMe ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}>
+                                                    {/* Rank */}
+                                                    <div className="w-8 text-center">
+                                                        {medal ? (
+                                                            <span className="text-lg">{medal}</span>
+                                                        ) : (
+                                                            <span className="text-sm font-bold text-slate-400">#{idx + 1}</span>
+                                                        )}
+                                                    </div>
+                                                    {/* Avatar */}
+                                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black ${isMe ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400"
+                                                        : idx < 3 ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400"
+                                                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
+                                                        {entry.avatarLetter}
+                                                    </div>
+                                                    {/* User info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className={`text-sm font-semibold truncate ${isMe ? "text-green-700 dark:text-green-400" : "text-slate-800 dark:text-white"}`}>
+                                                                {entry.name}
+                                                            </p>
+                                                            {isMe && <span className="text-[9px] font-bold bg-green-100 dark:bg-green-900 text-green-600 px-1.5 py-0.5 rounded-full">YOU</span>}
+                                                            {isFriend && <span className="text-[9px] font-bold bg-blue-100 dark:bg-blue-900 text-blue-600 px-1.5 py-0.5 rounded-full">FRIEND</span>}
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-400">Lv.{entry.level} · {entry.xp} XP · 🔥{entry.streak}</p>
+                                                    </div>
+                                                    {/* Add friend */}
+                                                    {!isMe && !isFriend && (
+                                                        <button
+                                                            disabled={hasSent}
+                                                            onClick={async () => {
+                                                                if (!user || !profile) return;
+                                                                await sendFriendRequest(user.uid, profile.name || "User", entry.uid);
+                                                                setSentRequests(prev => new Set([...prev, entry.uid]));
+                                                            }}
+                                                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${hasSent
+                                                                ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                                                                : "bg-blue-50 dark:bg-blue-950/30 text-blue-600 border border-blue-200 dark:border-blue-800 hover:bg-blue-100"}`}>
+                                                            {hasSent ? "Sent ✓" : "Add Friend"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </motion.div>
                 )}
 
                 {/* ═══════ CHALLENGES TAB ═══════ */}
                 {tab === "challenges" && (
-                    <motion.div key="challenges" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+                    <motion.div key="challenges" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
                         {/* Active challenges */}
                         {userChallenges.filter(c => !c.completed).length > 0 && (
                             <div>
                                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Active Challenges</h3>
                                 <div className="space-y-3">
                                     {userChallenges.filter(c => !c.completed).map(c => (
-                                        <div key={c.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-green-200 dark:border-green-800 p-4">
+                                        <div key={c.id} className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 rounded-2xl border border-green-200 dark:border-green-800 p-4">
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-2"><span className="text-lg">{c.icon}</span><span className="text-sm font-semibold text-slate-800 dark:text-white">{c.title}</span></div>
                                                 <span className="text-xs font-bold text-green-600">+{c.xpReward} XP</span>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                                <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                                    <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${(c.current / c.target) * 100}%` }} />
+                                                <div className="flex-1 h-2.5 rounded-full bg-white/60 dark:bg-slate-800 overflow-hidden">
+                                                    <motion.div className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-500"
+                                                        initial={{ width: 0 }} animate={{ width: `${(c.current / c.target) * 100}%` }} transition={{ duration: 0.5 }} />
                                                 </div>
                                                 <span className="text-[10px] font-semibold text-slate-400">{c.current}/{c.target} {c.unit}</span>
-                                                <button onClick={() => updateChallengeProgress(c.id, 1)} className="px-3 py-1 rounded-lg text-[10px] font-semibold bg-green-50 dark:bg-green-950 text-green-600 border border-green-200 dark:border-green-800 hover:bg-green-100 transition-colors">+1</button>
+                                                <button onClick={() => updateChallengeProgress(c.id, 1)}
+                                                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm">+1</button>
                                             </div>
                                         </div>
                                     ))}
@@ -447,7 +597,7 @@ export default function CommunityPage() {
                         {/* Completed */}
                         {userChallenges.filter(c => c.completed).length > 0 && (
                             <div>
-                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Completed</h3>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">✅ Completed</h3>
                                 <div className="space-y-2">
                                     {userChallenges.filter(c => c.completed).map(c => (
                                         <div key={c.id} className="bg-green-50 dark:bg-green-950/20 rounded-xl p-3 flex items-center gap-3 border border-green-200 dark:border-green-800">
@@ -460,20 +610,147 @@ export default function CommunityPage() {
                             </div>
                         )}
 
-                        {/* Available */}
+                        {/* Create challenge button */}
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Available Challenges</h3>
+                            <button onClick={() => setShowCreateChallenge(true)}
+                                className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm">
+                                + Create Challenge
+                            </button>
+                        </div>
+
+                        {/* Create challenge modal */}
+                        <AnimatePresence>
+                            {showCreateChallenge && (
+                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                                    className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-2xl border border-purple-200 dark:border-purple-800 p-5 space-y-3">
+                                    <h4 className="text-sm font-bold text-purple-800 dark:text-purple-300">Create Your Own Challenge</h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                            <label className="text-[10px] font-semibold text-slate-500 uppercase">Title</label>
+                                            <input value={newChTitle} onChange={e => setNewChTitle(e.target.value)} placeholder="e.g. Eat 3 fruits today"
+                                                className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus:border-purple-500" />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="text-[10px] font-semibold text-slate-500 uppercase">Description</label>
+                                            <input value={newChDesc} onChange={e => setNewChDesc(e.target.value)} placeholder="Brief description..."
+                                                className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus:border-purple-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-semibold text-slate-500 uppercase">Target</label>
+                                            <input type="number" value={newChTarget} onChange={e => setNewChTarget(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-semibold text-slate-500 uppercase">Unit</label>
+                                            <input value={newChUnit} onChange={e => setNewChUnit(e.target.value)} placeholder="days, servings, meals..."
+                                                className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-semibold text-slate-500 uppercase">Difficulty</label>
+                                            <select value={newChDifficulty} onChange={e => setNewChDifficulty(e.target.value as "Easy" | "Medium" | "Hard")}
+                                                className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none">
+                                                <option>Easy</option><option>Medium</option><option>Hard</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-semibold text-slate-500 uppercase">Icon</label>
+                                            <select value={newChIcon} onChange={e => setNewChIcon(e.target.value)}
+                                                className="w-full px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none">
+                                                {["🎯", "🍎", "💧", "🏃", "🥗", "📝", "🧘", "💪", "🔥", "⭐"].map(ic => <option key={ic} value={ic}>{ic}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <button onClick={async () => {
+                                            if (!newChTitle.trim() || !user) return;
+                                            const ch: CommChallenge = {
+                                                id: Date.now().toString(),
+                                                title: sanitize(newChTitle),
+                                                description: sanitize(newChDesc) || sanitize(newChTitle),
+                                                icon: newChIcon,
+                                                target: parseInt(newChTarget) || 5,
+                                                unit: sanitize(newChUnit) || "days",
+                                                difficulty: newChDifficulty,
+                                                xpReward: newChDifficulty === "Easy" ? 20 : newChDifficulty === "Medium" ? 40 : 60,
+                                                creatorUid: user.uid,
+                                                creatorName: sanitize(profile?.name || "User"),
+                                                acceptedBy: [],
+                                                timestamp: new Date().toISOString(),
+                                            };
+                                            await saveCommunityChallenge(ch);
+                                            setCommChallenges(prev => [ch, ...prev]);
+                                            setShowCreateChallenge(false);
+                                            setNewChTitle(""); setNewChDesc(""); setNewChTarget("5"); setNewChUnit("days");
+                                        }}
+                                            className="flex-1 py-2.5 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-700 transition-colors">
+                                            Create & Share
+                                        </button>
+                                        <button onClick={() => setShowCreateChallenge(false)}
+                                            className="px-4 py-2.5 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Community-created challenges */}
+                        {commChallenges.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-bold text-purple-500 uppercase tracking-wider mb-3">🌟 Community Challenges</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {commChallenges.map(ch => {
+                                        const accepted = ch.acceptedBy?.includes(user?.uid || "");
+                                        return (
+                                            <div key={ch.id}
+                                                className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/10 dark:to-indigo-950/10 rounded-2xl border border-purple-200 dark:border-purple-800 p-4 hover:shadow-md transition-all">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <span className="text-2xl">{ch.icon}</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ch.difficulty === "Easy" ? "bg-green-100 dark:bg-green-950 text-green-600" : ch.difficulty === "Hard" ? "bg-red-100 dark:bg-red-950 text-red-600" : "bg-amber-100 dark:bg-amber-950 text-amber-600"}`}>{ch.difficulty}</span>
+                                                </div>
+                                                <p className="text-sm font-semibold text-slate-800 dark:text-white mb-0.5">{ch.title}</p>
+                                                <p className="text-[10px] text-slate-400 mb-1">{ch.description}</p>
+                                                <div className="flex items-center justify-between text-[10px] text-slate-400 mb-3">
+                                                    <span>Target: {ch.target} {ch.unit} · +{ch.xpReward} XP</span>
+                                                    <span>by {ch.creatorName} · {ch.acceptedBy?.length || 0} joined</span>
+                                                </div>
+                                                <button onClick={async () => {
+                                                    if (!user) return;
+                                                    await acceptCommunityChallenge(ch.id, user.uid);
+                                                    setCommChallenges(prev => prev.map(c => c.id === ch.id ? { ...c, acceptedBy: [...(c.acceptedBy || []), user.uid] } : c));
+                                                }}
+                                                    disabled={accepted}
+                                                    className={`w-full py-2 rounded-lg text-xs font-semibold transition-all ${accepted
+                                                        ? "bg-purple-100 dark:bg-purple-950/30 text-purple-400 cursor-not-allowed"
+                                                        : "bg-purple-600 text-white hover:bg-purple-700 shadow-sm"}`}>
+                                                    {accepted ? "Joined ✓" : "Join Challenge"}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Built-in challenges */}
                         <div>
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Available Challenges</h3>
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Built-in Challenges</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {COMMUNITY_CHALLENGES.map((ch, i) => (
-                                    <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 hover:border-green-200 dark:hover:border-green-800 transition-colors">
+                                {BUILTIN_CHALLENGES.map((ch, i) => (
+                                    <div key={i} className={`rounded-2xl border p-4 hover:shadow-md transition-all ${ch.difficulty === "Hard"
+                                        ? "bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/10 dark:to-orange-950/10 border-red-200 dark:border-red-800"
+                                        : ch.difficulty === "Medium"
+                                            ? "bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/10 dark:to-yellow-950/10 border-amber-200 dark:border-amber-800"
+                                            : "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/10 dark:to-emerald-950/10 border-green-200 dark:border-green-800"}`}>
                                         <div className="flex items-start justify-between mb-2">
                                             <span className="text-2xl">{ch.icon}</span>
                                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ch.difficulty === "Easy" ? "bg-green-100 dark:bg-green-950 text-green-600" : ch.difficulty === "Hard" ? "bg-red-100 dark:bg-red-950 text-red-600" : "bg-amber-100 dark:bg-amber-950 text-amber-600"}`}>{ch.difficulty}</span>
                                         </div>
-                                        <p className="text-sm font-semibold text-slate-800 dark:text-white mb-1">{ch.title}</p>
-                                        <p className="text-[10px] text-slate-400 mb-3">Target: {ch.target} {ch.unit} · +{ch.xpReward} XP</p>
+                                        <p className="text-sm font-semibold text-slate-800 dark:text-white mb-0.5">{ch.title}</p>
+                                        <p className="text-[10px] text-slate-400 mb-3">{ch.description} · +{ch.xpReward} XP</p>
                                         <button onClick={() => acceptChallenge(i)}
-                                            className="w-full py-2 rounded-lg text-xs font-semibold bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-100 transition-colors">
+                                            className="w-full py-2 rounded-lg text-xs font-semibold bg-white/70 dark:bg-slate-900/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-900 transition-colors">
                                             Accept Challenge
                                         </button>
                                     </div>
