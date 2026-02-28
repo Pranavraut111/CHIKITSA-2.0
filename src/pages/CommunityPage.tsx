@@ -99,7 +99,25 @@ export default function CommunityPage() {
             }
         }
         if (tab === "challenges" && commChallenges.length === 0) {
-            getCommunityChallenges().then(setCommChallenges);
+            getCommunityChallenges().then(async all => {
+                // Deduplicate: keep first per title+creator
+                const seen = new Map<string, typeof all[0]>();
+                const dupeIds: string[] = [];
+                for (const ch of all) {
+                    const key = `${ch.title}_${ch.creatorUid}`;
+                    if (!seen.has(key)) { seen.set(key, ch); }
+                    else { dupeIds.push(ch.id); }
+                }
+                // Delete dupes from Firestore
+                if (dupeIds.length > 0) {
+                    const { deleteDoc, doc } = await import("firebase/firestore");
+                    const { db } = await import("../lib/firebase");
+                    for (const id of dupeIds) {
+                        deleteDoc(doc(db, "communityChallenges", id)).catch(() => { });
+                    }
+                }
+                setCommChallenges(Array.from(seen.values()));
+            });
         }
     }, [tab, user]);
 

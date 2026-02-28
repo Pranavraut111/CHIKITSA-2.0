@@ -145,6 +145,10 @@ export async function saveChallenge(uid: string, challenge: Challenge) {
     await setDoc(doc(db, "users", uid, "challenges", challenge.id), challenge);
 }
 
+export async function deleteChallenge(uid: string, challengeId: string) {
+    await deleteDoc(doc(db, "users", uid, "challenges", challengeId));
+}
+
 /* ═══════════════════ PET STATE ═══════════════════ */
 
 export async function getPetState(uid: string): Promise<PetState | null> {

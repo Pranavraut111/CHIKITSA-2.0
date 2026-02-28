@@ -114,7 +114,39 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
         ]);
         setAchievements(achs);
         setUnlockedIds(new Set(achs.filter(a => a.unlockedAt).map(a => a.id)));
-        setChallenges(chs);
+
+        // Deduplicate challenges: keep only one per title (prefer completed, then most progress)
+        const seen = new Map<string, Challenge>();
+        const toDelete: string[] = [];
+        for (const ch of chs) {
+            const key = ch.title;
+            const existing = seen.get(key);
+            if (!existing) {
+                seen.set(key, ch);
+            } else {
+                // Keep the one that's completed, or has most progress
+                if (ch.completed && !existing.completed) {
+                    toDelete.push(existing.id);
+                    seen.set(key, ch);
+                } else if (!ch.completed && existing.completed) {
+                    toDelete.push(ch.id);
+                } else if (ch.current > existing.current) {
+                    toDelete.push(existing.id);
+                    seen.set(key, ch);
+                } else {
+                    toDelete.push(ch.id);
+                }
+            }
+        }
+        // Delete duplicates from Firestore
+        if (toDelete.length > 0) {
+            const { deleteChallenge } = await import("../lib/firestore");
+            for (const id of toDelete) {
+                deleteChallenge(user.uid, id).catch(() => { });
+            }
+        }
+        const dedupedChallenges = Array.from(seen.values());
+        setChallenges(dedupedChallenges);
         if (petData) setPet(petData);
 
         // Load persisted user level + XP
