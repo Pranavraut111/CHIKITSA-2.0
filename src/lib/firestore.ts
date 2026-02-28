@@ -232,6 +232,10 @@ export async function updateCommunityPost(postId: string, updates: Partial<Commu
     await updateDoc(doc(db, "communityPosts", postId), updates as Record<string, unknown>);
 }
 
+export async function deleteCommunityPost(postId: string) {
+    await deleteDoc(doc(db, "communityPosts", postId));
+}
+
 /* ═══════════════════ LEADERBOARD ═══════════════════ */
 
 export interface LeaderboardEntry {

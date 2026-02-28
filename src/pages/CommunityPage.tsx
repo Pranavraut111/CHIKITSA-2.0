@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useGamification } from "../contexts/GamificationContext";
 import {
-    getMealPlanHistory, saveCommunityPost, getCommunityPosts, updateCommunityPost,
+    getMealPlanHistory, saveCommunityPost, getCommunityPosts, updateCommunityPost, deleteCommunityPost,
     getLeaderboard, sendFriendRequest, acceptFriendRequest, declineFriendRequest,
     getFriendRequests, getFriends, saveCommunityChallenge, getCommunityChallenges,
     acceptCommunityChallenge,
@@ -387,6 +387,25 @@ export default function CommunityPage() {
                                     {post.type === "achievement" && <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-[9px] font-bold text-amber-700 dark:text-amber-400">🏆 Achievement</span>}
                                     {post.type === "meal_plan" && <span className="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-950 text-[9px] font-bold text-green-700 dark:text-green-400">🍽 Meal Plan</span>}
                                     {post.type === "photo" && <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-[9px] font-bold text-blue-700 dark:text-blue-400">📸 Photo</span>}
+                                    {user && post.authorUid === user.uid && (
+                                        <button
+                                            onClick={async () => {
+                                                if (!user || post.authorUid !== user.uid) {
+                                                    alert("You can only delete your own posts.");
+                                                    return;
+                                                }
+                                                if (!window.confirm("Delete this post?")) return;
+                                                try {
+                                                    await deleteCommunityPost(post.id);
+                                                    setPosts(prev => prev.filter(p => p.id !== post.id));
+                                                } catch { /* ignore */ }
+                                            }}
+                                            className="ml-1 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                            title="Delete post"
+                                        >
+                                            🗑️
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Content */}

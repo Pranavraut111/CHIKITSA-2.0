@@ -102,7 +102,12 @@ export default function MealsPage() {
         setLoading(true); setError("");
         try {
             const raw = await generateMealPlan(getContext());
-            const cleaned = raw.replace(/```json\n?|```\n?/g, "").trim();
+            let cleaned = raw.replace(/```json\n?|```\n?/g, "").trim();
+            // Fix common Gemini JSON issues: trailing commas, extra text
+            cleaned = cleaned.replace(/,\s*([\]}])/g, "$1"); // trailing commas
+            const firstBrace = cleaned.indexOf("{");
+            const lastBrace = cleaned.lastIndexOf("}");
+            if (firstBrace !== -1 && lastBrace !== -1) cleaned = cleaned.slice(firstBrace, lastBrace + 1);
             const parsed = JSON.parse(cleaned);
             const dateStr = getDateStr(dayOffset);
             parsed.date = dateStr;
@@ -119,7 +124,11 @@ export default function MealsPage() {
         setRegenerating(mealType);
         try {
             const raw = await regenerateSingleMeal(mealType, getContext(), JSON.stringify(plan));
-            const cleaned = raw.replace(/```json\n?|```\n?/g, "").trim();
+            let cleaned = raw.replace(/```json\n?|```\n?/g, "").trim();
+            cleaned = cleaned.replace(/,\s*([\]}])/g, "$1");
+            const firstBrace = cleaned.indexOf("{");
+            const lastBrace = cleaned.lastIndexOf("}");
+            if (firstBrace !== -1 && lastBrace !== -1) cleaned = cleaned.slice(firstBrace, lastBrace + 1);
             const newMeal = JSON.parse(cleaned);
             const updated = { ...plan, [mealType]: newMeal };
             updated.totalCalories = MEALS.reduce((a, t) => a + ((updated as any)[t]?.calories || 0), 0);
@@ -260,7 +269,34 @@ export default function MealsPage() {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="text-[10px] text-slate-400">{loggedMeals.size}/{MEALS.length} eaten</div>
+                                <div className="flex items-center gap-3">
+                                    <div className="text-[10px] text-slate-400">{loggedMeals.size}/{MEALS.length} eaten</div>
+                                    <button
+                                        onClick={() => {
+                                            if (!plan) return;
+                                            const totalP = MEALS.reduce((a, t) => a + ((plan as any)[t]?.protein || 0), 0);
+                                            const totalC = MEALS.reduce((a, t) => a + ((plan as any)[t]?.carbs || 0), 0);
+                                            const totalF = MEALS.reduce((a, t) => a + ((plan as any)[t]?.fats || 0), 0);
+                                            const totalCal = plan.totalCalories || MEALS.reduce((a, t) => a + ((plan as any)[t]?.calories || 0), 0);
+                                            let text = `CHIKITSA — Meal Plan for ${plan.date || getDateStr(dayOffset)}\n`;
+                                            text += `Total: ${totalCal} kcal  |  Protein: ${totalP}g  Carbs: ${totalC}g  Fats: ${totalF}g\n`;
+                                            for (const m of MEALS) {
+                                                const meal = (plan as any)[m];
+                                                if (!meal) continue;
+                                                text += `\n${m}\n---${meal.name}\n`;
+                                                text += `${meal.calories} kcal  |  Protein: ${meal.protein}g  Carbs: ${meal.carbs}g  Fats: ${meal.fats}g\n`;
+                                                text += `Prep: ${meal.prepTime}  Cook: ${meal.cookTime}\n`;
+                                            }
+                                            navigator.clipboard.writeText(text.trim());
+                                            const btn = document.getElementById("copy-plan-btn");
+                                            if (btn) { btn.textContent = "Copied!"; setTimeout(() => { btn.textContent = "📋 Copy"; }, 1500); }
+                                        }}
+                                        id="copy-plan-btn"
+                                        className="px-3 py-1.5 text-[10px] font-bold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                    >
+                                        📋 Copy
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Individual meal cards */}
