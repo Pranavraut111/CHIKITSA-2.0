@@ -160,6 +160,9 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
     async function acceptChallenge(templateIdx: number) {
         if (!user) return;
         const tpl = CHALLENGE_TEMPLATES[templateIdx];
+        // Prevent duplicate: check if already have this challenge (active or completed)
+        const alreadyAccepted = challenges.some(c => c.title === tpl.title && !c.completed);
+        if (alreadyAccepted) return;
         const now = new Date();
         const end = new Date(now);
         end.setDate(end.getDate() + 7);
@@ -179,10 +182,14 @@ export function GamificationProvider({ children }: { children: ReactNode }) {
         if (!user) return;
         const idx = challenges.findIndex(c => c.id === challengeId);
         if (idx === -1) return;
-        const updated = { ...challenges[idx], current: challenges[idx].current + increment };
+        const ch = challenges[idx];
+        if (ch.completed) return; // Already completed
+        const updated = { ...ch, current: ch.current + increment };
         if (updated.current >= updated.target) {
             updated.completed = true;
-            // Give XP
+            // Award XP to USER profile (this actually updates their level)
+            addXP(updated.xpReward);
+            // Also give XP to pet
             const newPet = { ...pet, xp: pet.xp + updated.xpReward, happiness: Math.min(100, pet.happiness + 15), mood: "excited" as const };
             if (newPet.xp >= newPet.level * 100) { newPet.level++; newPet.xp = newPet.xp - (newPet.level - 1) * 100; }
             setPet(newPet);

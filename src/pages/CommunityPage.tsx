@@ -73,6 +73,7 @@ export default function CommunityPage() {
     const [newChUnit, setNewChUnit] = useState("days");
     const [newChDifficulty, setNewChDifficulty] = useState<"Easy" | "Medium" | "Hard">("Medium");
     const [newChIcon, setNewChIcon] = useState("🎯");
+    const [creatingChallenge, setCreatingChallenge] = useState(false);
 
     // Load posts from Firestore on mount
     useEffect(() => {
@@ -662,26 +663,31 @@ export default function CommunityPage() {
                                         </div>
                                     </div>
                                     <div className="flex gap-2 pt-2">
-                                        <button onClick={async () => {
-                                            if (!newChTitle.trim() || !user) return;
-                                            const ch: CommChallenge = {
-                                                id: Date.now().toString(),
-                                                title: sanitize(newChTitle),
-                                                description: sanitize(newChDesc) || sanitize(newChTitle),
-                                                icon: newChIcon,
-                                                target: parseInt(newChTarget) || 5,
-                                                unit: sanitize(newChUnit) || "days",
-                                                difficulty: newChDifficulty,
-                                                xpReward: newChDifficulty === "Easy" ? 20 : newChDifficulty === "Medium" ? 40 : 60,
-                                                creatorUid: user.uid,
-                                                creatorName: sanitize(profile?.name || "User"),
-                                                acceptedBy: [],
-                                                timestamp: new Date().toISOString(),
-                                            };
-                                            await saveCommunityChallenge(ch);
-                                            setCommChallenges(prev => [ch, ...prev]);
-                                            setShowCreateChallenge(false);
-                                            setNewChTitle(""); setNewChDesc(""); setNewChTarget("5"); setNewChUnit("days");
+                                        <button disabled={creatingChallenge} onClick={async () => {
+                                            if (!newChTitle.trim() || !user || creatingChallenge) return;
+                                            setCreatingChallenge(true);
+                                            try {
+                                                const ch: CommChallenge = {
+                                                    id: Date.now().toString(),
+                                                    title: sanitize(newChTitle),
+                                                    description: sanitize(newChDesc) || sanitize(newChTitle),
+                                                    icon: newChIcon,
+                                                    target: parseInt(newChTarget) || 5,
+                                                    unit: sanitize(newChUnit) || "days",
+                                                    difficulty: newChDifficulty,
+                                                    xpReward: newChDifficulty === "Easy" ? 20 : newChDifficulty === "Medium" ? 40 : 60,
+                                                    creatorUid: user.uid,
+                                                    creatorName: sanitize(profile?.name || "User"),
+                                                    acceptedBy: [],
+                                                    timestamp: new Date().toISOString(),
+                                                };
+                                                await saveCommunityChallenge(ch);
+                                                setCommChallenges(prev => [ch, ...prev]);
+                                                setShowCreateChallenge(false);
+                                                setNewChTitle(""); setNewChDesc(""); setNewChTarget("5"); setNewChUnit("days");
+                                            } finally {
+                                                setCreatingChallenge(false);
+                                            }
                                         }}
                                             className="flex-1 py-2.5 rounded-lg text-xs font-bold bg-purple-600 text-white hover:bg-purple-700 transition-colors">
                                             Create & Share
@@ -737,24 +743,30 @@ export default function CommunityPage() {
                         <div>
                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Built-in Challenges</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {BUILTIN_CHALLENGES.map((ch, i) => (
-                                    <div key={i} className={`rounded-2xl border p-4 hover:shadow-md transition-all ${ch.difficulty === "Hard"
-                                        ? "bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/10 dark:to-orange-950/10 border-red-200 dark:border-red-800"
-                                        : ch.difficulty === "Medium"
-                                            ? "bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/10 dark:to-yellow-950/10 border-amber-200 dark:border-amber-800"
-                                            : "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/10 dark:to-emerald-950/10 border-green-200 dark:border-green-800"}`}>
-                                        <div className="flex items-start justify-between mb-2">
-                                            <span className="text-2xl">{ch.icon}</span>
-                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ch.difficulty === "Easy" ? "bg-green-100 dark:bg-green-950 text-green-600" : ch.difficulty === "Hard" ? "bg-red-100 dark:bg-red-950 text-red-600" : "bg-amber-100 dark:bg-amber-950 text-amber-600"}`}>{ch.difficulty}</span>
+                                {BUILTIN_CHALLENGES.map((ch, i) => {
+                                    const alreadyActive = userChallenges.some(c => c.title === ch.title && !c.completed);
+                                    return (
+                                        <div key={i} className={`rounded-2xl border p-4 hover:shadow-md transition-all ${ch.difficulty === "Hard"
+                                            ? "bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/10 dark:to-orange-950/10 border-red-200 dark:border-red-800"
+                                            : ch.difficulty === "Medium"
+                                                ? "bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/10 dark:to-yellow-950/10 border-amber-200 dark:border-amber-800"
+                                                : "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/10 dark:to-emerald-950/10 border-green-200 dark:border-green-800"}`}>
+                                            <div className="flex items-start justify-between mb-2">
+                                                <span className="text-2xl">{ch.icon}</span>
+                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ch.difficulty === "Easy" ? "bg-green-100 dark:bg-green-950 text-green-600" : ch.difficulty === "Hard" ? "bg-red-100 dark:bg-red-950 text-red-600" : "bg-amber-100 dark:bg-amber-950 text-amber-600"}`}>{ch.difficulty}</span>
+                                            </div>
+                                            <p className="text-sm font-semibold text-slate-800 dark:text-white mb-0.5">{ch.title}</p>
+                                            <p className="text-[10px] text-slate-400 mb-3">{ch.description} · +{ch.xpReward} XP</p>
+                                            <button onClick={() => acceptChallenge(i)}
+                                                disabled={alreadyActive}
+                                                className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors ${alreadyActive
+                                                    ? "bg-green-100 dark:bg-green-950/30 text-green-500 cursor-not-allowed"
+                                                    : "bg-white/70 dark:bg-slate-900/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-900"}`}>
+                                                {alreadyActive ? "Active ✓" : "Accept Challenge"}
+                                            </button>
                                         </div>
-                                        <p className="text-sm font-semibold text-slate-800 dark:text-white mb-0.5">{ch.title}</p>
-                                        <p className="text-[10px] text-slate-400 mb-3">{ch.description} · +{ch.xpReward} XP</p>
-                                        <button onClick={() => acceptChallenge(i)}
-                                            className="w-full py-2 rounded-lg text-xs font-semibold bg-white/70 dark:bg-slate-900/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-900 transition-colors">
-                                            Accept Challenge
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     </motion.div>
